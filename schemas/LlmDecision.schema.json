@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "LlmDecision.schema.json",
+  "title": "LlmDecision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["decision", "confidence", "chosenCandidateId", "stopLossAnchor", "notes"],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["ALLOWLONGW3", "ALLOWSHORTW5END", "REJECT", "UNCERTAIN"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "chosenCandidateId": { "type": ["string", "null"] },
+    "stopLossAnchor": {
+      "type": "string",
+      "enum": ["WAVEINVALIDATION", "SWINGLEVEL", "ATRCAP"]
+    },
+    "notes": { "type": "string" }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "SignalSnapshot.schema.json",
+  "title": "SignalSnapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["symbol", "computedAtUtc", "timeframes"],
+  "properties": {
+    "symbol": { "type": "string" },
+    "computedAtUtc": { "type": "string", "format": "date-time" },
+    "timeframes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/timeframeSnapshot" }
+    }
+  },
+  "$defs": {
+    "timeframe": {
+      "type": "string",
+      "enum": ["M1", "M5", "M15", "H1", "H4", "D1"]
+    },
+    "rsiState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "state"],
+      "properties": {
+        "value": { "type": "number" },
+        "state": { "type": "string" }
+      }
+    },
+    "stochRsiState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["k", "d", "state"],
+      "properties": {
+        "k": { "type": "number" },
+        "d": { "type": "number" },
+        "state": { "type": "string" }
+      }
+    },
+    "macdState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["macd", "signal", "hist", "state"],
+      "properties": {
+        "macd": { "type": "number" },
+        "signal": { "type": "number" },
+        "hist": { "type": "number" },
+        "state": { "type": "string" }
+      }
+    },
+    "volumeState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "state", "rule"],
+      "properties": {
+        "value": { "type": "number" },
+        "state": { "type": "string" },
+        "rule": { "type": "string" }
+      }
+    },
+    "timeframeSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tf", "rsi", "stochRsi", "macd", "volume"],
+      "properties": {
+        "tf": { "$ref": "#/$defs/timeframe" },
+        "rsi": { "$ref": "#/$defs/rsiState" },
+        "stochRsi": { "$ref": "#/$defs/stochRsiState" },
+        "macd": { "$ref": "#/$defs/macdState" },
+        "volume": { "$ref": "#/$defs/volumeState" }
+      }
+    }
+  }
+}

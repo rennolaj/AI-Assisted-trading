@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"$SCRIPT_DIR/dotnet.sh" test "$SCRIPT_DIR/../tests/Mvp.Trading.Contracts.Tests/Mvp.Trading.Contracts.Tests.csproj" --no-build "$@"

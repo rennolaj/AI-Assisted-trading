@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "AlertEvent.schema.json",
+  "title": "AlertEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "alertId",
+    "receivedAtUtc",
+    "source",
+    "idempotencyKey",
+    "tv",
+    "intent",
+    "rawPayload"
+  ],
+  "properties": {
+    "alertId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "receivedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "type": "string"
+    },
+    "tv": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ticker", "exchange", "interval"],
+      "properties": {
+        "ticker": { "type": "string" },
+        "exchange": { "type": "string" },
+        "interval": { "type": "string" },
+        "close": { "type": ["number", "null"] },
+        "volume": { "type": ["number", "null"] }
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["directionHint", "symbolHint", "reason"],
+      "properties": {
+        "directionHint": {
+          "type": "string",
+          "enum": ["LONG", "SHORT", "UNKNOWN"]
+        },
+        "symbolHint": { "type": "string" },
+        "reason": { "type": "string" }
+      }
+    },
+    "rawPayload": {
+      "type": "string"
+    }
+  }
+}

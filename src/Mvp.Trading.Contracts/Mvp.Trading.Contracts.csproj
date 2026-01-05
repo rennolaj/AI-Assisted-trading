@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Mvp.Trading.Contracts</AssemblyName>
+    <RootNamespace>Mvp.Trading.Contracts</RootNamespace>
+  </PropertyGroup>
+</Project>

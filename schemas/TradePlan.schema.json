@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "TradePlan.schema.json",
+  "title": "TradePlan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "planId",
+    "side",
+    "entry",
+    "stopLoss",
+    "margin",
+    "createdAtUtc"
+  ],
+  "properties": {
+    "planId": { "type": "string", "format": "uuid" },
+    "side": { "type": "string" },
+    "entry": { "$ref": "#/$defs/entrySpec" },
+    "stopLoss": { "$ref": "#/$defs/stopSpec" },
+    "takeProfit": { "$ref": "#/$defs/takeProfitSpec" },
+    "margin": { "$ref": "#/$defs/marginSpec" },
+    "createdAtUtc": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "entrySpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "price", "maxSlippageBps"],
+      "properties": {
+        "type": { "type": "string" },
+        "price": { "type": ["number", "null"] },
+        "maxSlippageBps": { "type": "integer" }
+      }
+    },
+    "stopSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "price", "reason"],
+      "properties": {
+        "type": { "type": "string" },
+        "price": { "type": "number" },
+        "reason": { "type": "string" }
+      }
+    },
+    "takeProfitSpec": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["type", "price"],
+      "properties": {
+        "type": { "type": "string" },
+        "price": { "type": ["number", "null"] }
+      }
+    },
+    "marginSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["leverage", "notional"],
+      "properties": {
+        "leverage": { "type": "number" },
+        "notional": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.vscode/
+**/.idea/
+.git/
+.gitignore
+.DS_Store
+*.user
+*.suo
+*.cache
+*.log
+**/node_modules/
+.env
+.env.*
