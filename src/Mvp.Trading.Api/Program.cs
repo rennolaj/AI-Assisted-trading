@@ -16,6 +16,7 @@ builder.Services.AddSingleton<IAlertQueue, RedisAlertQueue>();
 builder.Services.AddSingleton<IAlertStore, PostgresAlertStore>();
 builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 builder.Services.AddSingleton<IAlertProcessingQuery, PostgresAlertProcessingQuery>();
+builder.Services.AddSingleton<IOpenTradeCommand, PostgresOpenTradeCommand>();
 builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
@@ -155,6 +156,26 @@ app.MapGet("/alerts/status/{idempotencyKey}", async (
     .WithTags("Alerts")
     .WithSummary("Get processing status for an alert.")
     .WithDescription("Returns the latest processing status for the given idempotency key.");
+
+app.MapPost("/trades/open", async (
+        OpenTradeRequest request,
+        IOpenTradeCommand command,
+        CancellationToken ct) =>
+    {
+        if (string.IsNullOrWhiteSpace(request.ExchangeId) ||
+            string.IsNullOrWhiteSpace(request.Symbol) ||
+            string.IsNullOrWhiteSpace(request.Side))
+        {
+            return Results.BadRequest(new { error = "ExchangeId, Symbol, and Side are required." });
+        }
+
+        var tradeId = await command.CreateOpenTradeAsync(request, ct);
+        return Results.Created($"/trades/open/{tradeId}", new { tradeId });
+    })
+    .WithName("CreateOpenTrade")
+    .WithTags("Trades")
+    .WithSummary("Seed an open trade for monitoring.")
+    .WithDescription("Creates an open trade record that the monitor worker will validate for invalidation.");
 
 app.MapGet("/health/dependencies", async (
         NpgsqlDataSource dataSource,

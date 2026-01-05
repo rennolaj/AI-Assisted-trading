@@ -27,6 +27,14 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Postgres__ConnectionString: "${POSTGRES_CONNECTION_STRING:-Host=postgres;Port=5432;Database=ai-trading-db;Username=postgres;Password=postgres}"
+      KrakenFutures__Environment: "${KRAKEN_FUTURES_ENV:-demo}"
+      KrakenFutures__BaseUrl: "${KRAKEN_FUTURES_REST_BASE:-}"
+      KrakenFutures__AuthBaseUrl: "${KRAKEN_FUTURES_AUTH_BASE:-}"
+      KrakenFutures__WebSocketUrl: "${KRAKEN_FUTURES_WS_URL:-}"
+      KrakenFutures__TestSymbol: "${KRAKEN_FUTURES_TEST_SYMBOL:-}"
+      KrakenFutures__ApiKey: "${KRAKEN_FUTURES_API_KEY:-}"
+      KrakenFutures__ApiSecret: "${KRAKEN_FUTURES_API_SECRET:-}"
+      KrakenFutures__TimeoutSeconds: "${KRAKEN_FUTURES_TIMEOUT_SECONDS:-10}"
       Redis__ConnectionString: "${REDIS_CONNECTION_STRING:-redis:6379}"
       Redis__AlertQueueKey: "${REDIS_ALERT_QUEUE_KEY:-mvp:alerts}"
     depends_on:

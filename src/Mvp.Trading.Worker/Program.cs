@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
 using StackExchange.Redis;
+using Mvp.Trading.Integrations.Kraken;
+using Mvp.Trading.Contracts;
 
 namespace Mvp.Trading.Worker;
 
@@ -16,6 +18,7 @@ public static class Program
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.Configuration
+            .AddJsonFile("config/kraken-futures.json", optional: true, reloadOnChange: true)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
             .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables();
@@ -26,7 +29,22 @@ public static class Program
             options.RedisConnectionString = redisSection["ConnectionString"] ?? string.Empty;
             options.AlertQueueKey = redisSection["AlertQueueKey"] ?? "mvp:alerts";
             options.PollIntervalMs = int.TryParse(builder.Configuration["Worker:PollIntervalMs"], out var ms) ? ms : 500;
+            options.TradeMonitorIntervalMs = int.TryParse(builder.Configuration["Worker:TradeMonitorIntervalMs"], out var monitorMs)
+                ? monitorMs
+                : 2000;
         });
+
+        var krakenOptions = builder.Configuration.GetSection("KrakenFutures").Get<KrakenFuturesOptions>() ?? new KrakenFuturesOptions();
+        ApplyKrakenEnvironmentOverrides(builder.Configuration, krakenOptions);
+        builder.Services.AddSingleton(krakenOptions);
+        var krakenCacheOptions = builder.Configuration.GetSection("KrakenFutures:Cache").Get<KrakenFuturesCacheOptions>() ?? new KrakenFuturesCacheOptions();
+        var krakenRateLimitOptions = builder.Configuration.GetSection("KrakenFutures:RateLimit").Get<KrakenFuturesRateLimitOptions>() ?? new KrakenFuturesRateLimitOptions();
+        builder.Services.AddSingleton(krakenCacheOptions);
+        builder.Services.AddSingleton(krakenRateLimitOptions);
+        builder.Services.AddSingleton<KrakenFuturesRateLimitBudget>();
+        builder.Services.AddMemoryCache();
+        builder.Services.AddHttpClient<KrakenFuturesMarketDataProvider>();
+        builder.Services.AddSingleton<IMarketDataProvider>(sp => sp.GetRequiredService<KrakenFuturesMarketDataProvider>());
 
         builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
         {
@@ -51,8 +69,59 @@ public static class Program
         });
 
         builder.Services.AddSingleton<IAlertProcessingStore, PostgresAlertProcessingStore>();
+        builder.Services.AddSingleton<IOpenTradeRepository, PostgresOpenTradeRepository>();
         builder.Services.AddHostedService<AlertWorker>();
+        builder.Services.AddHostedService<TradeMonitorWorker>();
 
         await builder.Build().RunAsync();
+    }
+
+    private static void ApplyKrakenEnvironmentOverrides(IConfiguration configuration, KrakenFuturesOptions options)
+    {
+        var environment = options.Environment?.Trim();
+        if (string.IsNullOrWhiteSpace(environment))
+        {
+            return;
+        }
+
+        var normalized = NormalizeEnvironment(environment);
+        var envSection = configuration.GetSection($"KrakenFutures:Environments:{normalized}");
+        var envOptions = envSection.Get<KrakenFuturesEnvironmentOptions>();
+        if (envOptions is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(envOptions.BaseUrl))
+        {
+            options.BaseUrl = envOptions.BaseUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(envOptions.AuthBaseUrl))
+        {
+            options.AuthBaseUrl = envOptions.AuthBaseUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(envOptions.WebSocketUrl))
+        {
+            options.WebSocketUrl = envOptions.WebSocketUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(envOptions.TestSymbol))
+        {
+            options.TestSymbol = envOptions.TestSymbol;
+        }
+    }
+
+    private static string NormalizeEnvironment(string environment)
+    {
+        return environment.Trim().ToLowerInvariant() switch
+        {
+            "production" => "prod",
+            "prod" => "prod",
+            "sandbox" => "demo",
+            "demo" => "demo",
+            _ => environment.Trim().ToLowerInvariant()
+        };
     }
 }

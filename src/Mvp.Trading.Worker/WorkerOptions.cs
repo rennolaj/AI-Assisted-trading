@@ -19,4 +19,9 @@ public sealed class WorkerOptions
     /// Delay between polling attempts when the queue is empty.
     /// </summary>
     public int PollIntervalMs { get; set; } = 500;
+
+    /// <summary>
+    /// Delay between trade monitor cycles.
+    /// </summary>
+    public int TradeMonitorIntervalMs { get; set; } = 2000;
 }

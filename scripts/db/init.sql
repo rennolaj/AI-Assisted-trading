@@ -23,3 +23,21 @@ create table if not exists alert_processing (
 );
 
 create index if not exists alert_processing_status_idx on alert_processing (status);
+
+create table if not exists open_trades (
+    trade_id uuid primary key,
+    exchange_id text not null,
+    symbol text not null,
+    side text not null,
+    entry_price numeric,
+    invalidation_price numeric,
+    status text not null,
+    opened_at_utc timestamptz not null,
+    last_checked_utc timestamptz,
+    last_price numeric,
+    invalidated_at_utc timestamptz,
+    invalidation_reason text
+);
+
+create index if not exists open_trades_status_idx on open_trades (status);
+create index if not exists open_trades_exchange_idx on open_trades (exchange_id);

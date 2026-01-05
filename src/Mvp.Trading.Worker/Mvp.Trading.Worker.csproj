@@ -9,11 +9,18 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.0" />
     <PackageReference Include="Npgsql" Version="8.0.4" />
     <PackageReference Include="StackExchange.Redis" Version="2.8.22" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Mvp.Trading.Contracts\Mvp.Trading.Contracts.csproj" />
+    <ProjectReference Include="..\Mvp.Trading.Integrations.Kraken\Mvp.Trading.Integrations.Kraken.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\config\kraken-futures.json" Link="config/kraken-futures.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

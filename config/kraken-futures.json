@@ -1,0 +1,19 @@
+{
+  "KrakenFutures": {
+    "Environment": "demo",
+    "Environments": {
+      "demo": {
+        "BaseUrl": "https://demo-futures.kraken.com/derivatives/api/v3",
+        "AuthBaseUrl": "https://demo-futures.kraken.com/api/auth/v1",
+        "WebSocketUrl": "wss://demo-futures.kraken.com/ws/v1",
+        "TestSymbol": "PI_XBTUSD"
+      },
+      "prod": {
+        "BaseUrl": "https://futures.kraken.com/derivatives/api/v3",
+        "AuthBaseUrl": "https://futures.kraken.com/api/auth/v1",
+        "WebSocketUrl": "wss://futures.kraken.com/ws/v1",
+        "TestSymbol": "PI_XBTUSD"
+      }
+    }
+  }
+}
