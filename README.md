@@ -21,6 +21,40 @@ docker compose up --build
 Set `KRAKEN_FUTURES_ENV=demo` (sandbox) or `KRAKEN_FUTURES_ENV=prod` (live) in `.env` to switch Kraken Futures environments.
 Endpoint defaults live in `config/kraken-futures.json`.
 
+## Smoke test (ngrok)
+This uses `scripts/smoke.sh` plus a local `.env.smoke` file (not committed).
+
+1) Start ngrok and copy the forwarding URL:
+```bash
+ngrok http 8080
+```
+
+2) Create `.env.smoke` with your ngrok host and secret:
+```bash
+BASE_URL=https://your-ngrok-host.ngrok-free.dev
+TRADINGVIEW_WEBHOOK_SECRET=your-secret-here
+SYMBOL_HINT=BTCUSD.P
+TICKER=BTCUSD.P
+EXCHANGE=krakenfutures
+INTERVAL=1
+SLEEP_SECONDS=3
+```
+
+3) Start API + worker using the smoke env file (does not touch dev config):
+```bash
+docker compose --env-file .env.smoke up -d --build api worker
+```
+
+4) In TradingView, load `tests/pineScript/mvp-smoke-test-alerts.pine` and create an alert:
+- Webhook URL: `https://your-ngrok-host.ngrok-free.dev/webhooks/tradingview/your-secret-here`
+- Message: `{{alert_message}}`
+- Condition: "Any alert() function call"
+
+5) Run the smoke test:
+```bash
+./scripts/smoke.sh
+```
+
 Health checks:
 - `http://localhost:8080/health`
 - `http://localhost:8080/health/dependencies`

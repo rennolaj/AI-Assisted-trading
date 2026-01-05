@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "IndicatorSnapshot.schema.json",
+  "title": "IndicatorSnapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "alertId",
+    "correlationId",
+    "symbol",
+    "mode",
+    "direction",
+    "anchorTimeframe",
+    "trendTimeframe",
+    "evaluationTimeUtc",
+    "computedAtUtc",
+    "parameters",
+    "timeframes",
+    "gates",
+    "confirmations",
+    "score",
+    "risk"
+  ],
+  "properties": {
+    "alertId": { "type": "string", "format": "uuid" },
+    "correlationId": { "type": "string", "format": "uuid" },
+    "symbol": { "type": "string" },
+    "mode": { "type": "string" },
+    "direction": { "type": "string" },
+    "anchorTimeframe": { "$ref": "#/$defs/timeframe" },
+    "trendTimeframe": { "$ref": "#/$defs/timeframe" },
+    "evaluationTimeUtc": { "type": "string", "format": "date-time" },
+    "computedAtUtc": { "type": "string", "format": "date-time" },
+    "parameters": { "$ref": "#/$defs/indicatorParameters" },
+    "timeframes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/timeframeSnapshot" }
+    },
+    "gates": { "$ref": "#/$defs/gates" },
+    "confirmations": { "$ref": "#/$defs/confirmations" },
+    "score": { "$ref": "#/$defs/score" },
+    "risk": { "$ref": "#/$defs/risk" }
+  },
+  "$defs": {
+    "timeframe": {
+      "type": "string",
+      "enum": ["M1", "M5", "M15", "M30", "H1", "H2", "H4", "H12", "D1"]
+    },
+    "indicatorParameters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rsiPeriod", "stochRsiPeriod", "macdFast", "macdSlow", "macdSignal", "volumeRule"],
+      "properties": {
+        "rsiPeriod": { "type": "integer", "minimum": 1 },
+        "stochRsiPeriod": { "type": "integer", "minimum": 1 },
+        "macdFast": { "type": "integer", "minimum": 1 },
+        "macdSlow": { "type": "integer", "minimum": 1 },
+        "macdSignal": { "type": "integer", "minimum": 1 },
+        "volumeRule": { "$ref": "#/$defs/volumeRule" }
+      }
+    },
+    "volumeRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "period", "threshold"],
+      "properties": {
+        "mode": { "type": "string" },
+        "period": { "type": "integer", "minimum": 1 },
+        "threshold": { "type": "number" }
+      }
+    },
+    "rsiState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "state"],
+      "properties": {
+        "value": { "type": "number" },
+        "state": { "type": "string" }
+      }
+    },
+    "stochRsiState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["k", "d", "state"],
+      "properties": {
+        "k": { "type": "number" },
+        "d": { "type": "number" },
+        "state": { "type": "string" }
+      }
+    },
+    "macdState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["macd", "signal", "hist", "state"],
+      "properties": {
+        "macd": { "type": "number" },
+        "signal": { "type": "number" },
+        "hist": { "type": "number" },
+        "state": { "type": "string" }
+      }
+    },
+    "volumeState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "state", "rule"],
+      "properties": {
+        "value": { "type": "number" },
+        "state": { "type": "string" },
+        "rule": { "type": "string" }
+      }
+    },
+    "timeframeSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tf", "rsi", "stochRsi", "macd", "volume"],
+      "properties": {
+        "tf": { "$ref": "#/$defs/timeframe" },
+        "rsi": { "$ref": "#/$defs/rsiState" },
+        "stochRsi": { "$ref": "#/$defs/stochRsiState" },
+        "macd": { "$ref": "#/$defs/macdState" },
+        "volume": { "$ref": "#/$defs/volumeState" }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dataIntegrity", "rsiExtremeAnchor", "directionDeclared"],
+      "properties": {
+        "dataIntegrity": { "type": "boolean" },
+        "rsiExtremeAnchor": { "type": "boolean" },
+        "directionDeclared": { "type": "boolean" }
+      }
+    },
+    "confirmations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rsiMultiTf",
+        "stochRsiReversal",
+        "macdMomentum",
+        "trendAlignment",
+        "volumeConfirm",
+        "counterTrendVolumeOk"
+      ],
+      "properties": {
+        "rsiMultiTf": { "type": "boolean" },
+        "stochRsiReversal": { "type": "boolean" },
+        "macdMomentum": { "type": "boolean" },
+        "trendAlignment": { "type": "boolean" },
+        "volumeConfirm": { "type": "boolean" },
+        "counterTrendVolumeOk": { "type": "boolean" }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confirmations", "score", "maxScore", "scorePercent"],
+      "properties": {
+        "confirmations": { "type": "integer", "minimum": 0 },
+        "score": { "type": "integer", "minimum": 0 },
+        "maxScore": { "type": "integer", "minimum": 1 },
+        "scorePercent": { "type": "number", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "action", "riskMultiplier", "trendRequired", "counterTrendAllowed", "minConfirmations"],
+      "properties": {
+        "category": { "type": "string" },
+        "action": { "type": "string" },
+        "riskMultiplier": { "type": "number" },
+        "trendRequired": { "type": "boolean" },
+        "counterTrendAllowed": { "type": "boolean" },
+        "minConfirmations": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

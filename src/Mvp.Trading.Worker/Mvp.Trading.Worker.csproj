@@ -17,10 +17,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Mvp.Trading.Contracts\Mvp.Trading.Contracts.csproj" />
+    <ProjectReference Include="..\Mvp.Trading.Indicators\Mvp.Trading.Indicators.csproj" />
     <ProjectReference Include="..\Mvp.Trading.Integrations.Kraken\Mvp.Trading.Integrations.Kraken.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\..\config\kraken-futures.json" Link="config/kraken-futures.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

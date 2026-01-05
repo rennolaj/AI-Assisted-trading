@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Mvp.Trading.Contracts;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Mvp.Trading.Api.Services;
 
@@ -41,7 +42,8 @@ on conflict (idempotency_key) do nothing;";
         cmd.Parameters.AddWithValue("received_at_utc", alert.ReceivedAtUtc.UtcDateTime);
         cmd.Parameters.AddWithValue("source", alert.Source);
         cmd.Parameters.AddWithValue("raw_payload", rawPayload);
-        cmd.Parameters.AddWithValue("alert_json", JsonSerializer.Serialize(alert, _jsonOptions));
+        var alertJson = JsonSerializer.Serialize(alert, _jsonOptions);
+        cmd.Parameters.Add("alert_json", NpgsqlDbType.Jsonb).Value = alertJson;
 
         await cmd.ExecuteNonQueryAsync(ct);
     }

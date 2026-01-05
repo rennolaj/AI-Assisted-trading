@@ -13,6 +13,7 @@ create table if not exists alerts (
 );
 
 create index if not exists alerts_received_at_idx on alerts (received_at_utc desc);
+create unique index if not exists alerts_idempotency_key_idx on alerts (idempotency_key);
 
 create table if not exists alert_processing (
     alert_id uuid primary key references alerts(alert_id),
@@ -41,3 +42,16 @@ create table if not exists open_trades (
 
 create index if not exists open_trades_status_idx on open_trades (status);
 create index if not exists open_trades_exchange_idx on open_trades (exchange_id);
+
+create table if not exists indicator_snapshots (
+    alert_id uuid primary key references alerts(alert_id),
+    correlation_id uuid not null,
+    computed_at_utc timestamptz not null,
+    evaluation_time_utc timestamptz not null,
+    symbol text not null,
+    mode text not null,
+    direction text not null,
+    snapshot_json jsonb not null
+);
+
+create index if not exists indicator_snapshots_symbol_idx on indicator_snapshots (symbol);

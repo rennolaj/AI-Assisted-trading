@@ -14,6 +14,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Integrations.Kr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Integrations.Kraken.Tests", "tests\\Mvp.Trading.Integrations.Kraken.Tests\\Mvp.Trading.Integrations.Kraken.Tests.csproj", "{1B5D9550-C7C1-41F4-9F2B-01462FC5765E}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Indicators", "src\\Mvp.Trading.Indicators\\Mvp.Trading.Indicators.csproj", "{A32A6794-73C3-417B-BF1F-B97CCE493298}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Indicators.Tests", "tests\\Mvp.Trading.Indicators.Tests\\Mvp.Trading.Indicators.Tests.csproj", "{EF49D6FD-F5BC-4142-B906-00227E949CC3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +48,14 @@ Global
 		{1B5D9550-C7C1-41F4-9F2B-01462FC5765E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1B5D9550-C7C1-41F4-9F2B-01462FC5765E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1B5D9550-C7C1-41F4-9F2B-01462FC5765E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A32A6794-73C3-417B-BF1F-B97CCE493298}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A32A6794-73C3-417B-BF1F-B97CCE493298}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A32A6794-73C3-417B-BF1F-B97CCE493298}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A32A6794-73C3-417B-BF1F-B97CCE493298}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EF49D6FD-F5BC-4142-B906-00227E949CC3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EF49D6FD-F5BC-4142-B906-00227E949CC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EF49D6FD-F5BC-4142-B906-00227E949CC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EF49D6FD-F5BC-4142-B906-00227E949CC3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -227,8 +227,11 @@ public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
         Timeframe.M1 => 1,
         Timeframe.M5 => 5,
         Timeframe.M15 => 15,
+        Timeframe.M30 => 30,
         Timeframe.H1 => 60,
+        Timeframe.H2 => 120,
         Timeframe.H4 => 240,
+        Timeframe.H12 => 720,
         Timeframe.D1 => 1440,
         _ => 1
     };

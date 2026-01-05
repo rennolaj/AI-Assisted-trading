@@ -1,0 +1,128 @@
+//@version=6
+indicator("MVP Smoke Test Alerts (5m)", overlay=true)
+
+// ----------------------
+// Inputs (tune to trigger more/less often)
+// ----------------------
+rsiLen   = input.int(14, "RSI Length", minval=2)
+rsiOB    = input.float(70, "RSI Overbought", step=0.5)
+rsiOS    = input.float(30, "RSI Oversold", step=0.5)
+
+macdFast = input.int(12, "MACD Fast", minval=1)
+macdSlow = input.int(26, "MACD Slow", minval=2)
+macdSig  = input.int(9,  "MACD Signal", minval=1)
+
+volLen   = input.int(20, "Volume SMA Length", minval=2)
+volMult  = input.float(1.5, "Volume Spike Multiplier", step=0.1)
+
+maFast   = input.int(9,  "Fast EMA", minval=1)
+maSlow   = input.int(21, "Slow EMA", minval=2)
+
+priceMovePct = input.float(0.40, "Price Move % (1 bar)", step=0.05)
+floodMode    = input.bool(true, "Flood Mode (extra realtime alerts)")
+microMovePct = input.float(0.01, "Micro Price Move %", step=0.01)
+pulseMs      = input.int(250, "Pulse Interval (ms)", minval=50, maxval=5000)
+
+// ----------------------
+// Calculations
+// ----------------------
+rsi = ta.rsi(close, rsiLen)
+[macdLine, signalLine, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
+
+volSma   = ta.sma(volume, volLen)
+volRatio = na(volSma) or volSma == 0 ? na : volume / volSma
+
+emaFastV = ta.ema(close, maFast)
+emaSlowV = ta.ema(close, maSlow)
+
+priceChangePct = na(close[1]) or close[1] == 0 ? na : (close - close[1]) / close[1] * 100.0
+
+// ----------------------
+// Smoke-test conditions
+// ----------------------
+condRsiOB = rsi >= rsiOB
+condRsiOS = rsi <= rsiOS
+
+condMacdBull = ta.crossover(macdLine, signalLine)
+condMacdBear = ta.crossunder(macdLine, signalLine)
+
+condVolSpike = not na(volRatio) and volRatio >= volMult
+
+condMaBull = ta.crossover(emaFastV, emaSlowV)
+condMaBear = ta.crossunder(emaFastV, emaSlowV)
+
+condPriceUp   = not na(priceChangePct) and priceChangePct >= priceMovePct
+condPriceDown = not na(priceChangePct) and priceChangePct <= -priceMovePct
+
+condMicroUp   = floodMode and not na(priceChangePct) and priceChangePct >= microMovePct
+condMicroDown = floodMode and not na(priceChangePct) and priceChangePct <= -microMovePct
+
+pulseBucket = math.floor(timenow / pulseMs)
+var float lastPulseBucket = na
+condPulse = floodMode and barstate.isrealtime and (na(lastPulseBucket) or pulseBucket != lastPulseBucket)
+if condPulse
+    lastPulseBucket := pulseBucket
+
+// ----------------------
+// Payload helpers
+// ----------------------
+ticker   = "BTCUSD.P"
+exchange = "krakenfutures"
+interval = timeframe.period
+
+f_num(_v) =>
+    na(_v) ? "null" : str.tostring(_v)
+
+f_id(_conditionId) =>
+    str.format("{0}-{1}-{2}-{3}", ticker, interval, _conditionId, str.tostring(time_close))
+
+f_json(_conditionId, _direction) =>
+    str.format(
+        "{{\"idempotencyKey\":\"{0}\",\"ticker\":\"{1}\",\"exchange\":\"{2}\",\"interval\":\"{3}\",\"close\":{4},\"volume\":{5},\"directionHint\":\"{6}\",\"symbolHint\":\"{7}\",\"reason\":\"{8}\"}}",
+        f_id(_conditionId),
+        ticker,
+        exchange,
+        interval,
+        f_num(close),
+        f_num(volume),
+        _direction,
+        ticker,
+        _conditionId
+    )
+
+dirFromTrend = emaFastV >= emaSlowV ? "LONG" : "SHORT"
+
+// ----------------------
+// Fire alerts (bar close only)
+// ----------------------
+if barstate.isconfirmed
+    if condRsiOB
+        alert(f_json("RSI_OVERBOUGHT", "SHORT"), alert.freq_once_per_bar_close)
+    if condRsiOS
+        alert(f_json("RSI_OVERSOLD", "LONG"), alert.freq_once_per_bar_close)
+
+    if condMacdBull
+        alert(f_json("MACD_BULL_CROSS", "LONG"), alert.freq_once_per_bar_close)
+    if condMacdBear
+        alert(f_json("MACD_BEAR_CROSS", "SHORT"), alert.freq_once_per_bar_close)
+
+    if condVolSpike
+        alert(f_json("VOLUME_SPIKE", dirFromTrend), alert.freq_once_per_bar_close)
+
+    if condMaBull
+        alert(f_json("EMA_BULL_CROSS", "LONG"), alert.freq_once_per_bar_close)
+    if condMaBear
+        alert(f_json("EMA_BEAR_CROSS", "SHORT"), alert.freq_once_per_bar_close)
+
+    if condPriceUp
+        alert(f_json("PRICE_UP_MOVE", "LONG"), alert.freq_once_per_bar_close)
+    if condPriceDown
+        alert(f_json("PRICE_DOWN_MOVE", "SHORT"), alert.freq_once_per_bar_close)
+
+if barstate.isrealtime
+    if condPulse
+        alert(f_json("PULSE", dirFromTrend), alert.freq_all)
+    if condMicroUp
+        alert(f_json("MICRO_UP_MOVE", "LONG"), alert.freq_all)
+    if condMicroDown
+        alert(f_json("MICRO_DOWN_MOVE", "SHORT"), alert.freq_all)

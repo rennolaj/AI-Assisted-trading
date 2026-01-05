@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Indicators;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -17,16 +18,25 @@ public sealed class AlertWorker : BackgroundService
     private readonly WorkerOptions _options;
     private readonly ILogger<AlertWorker> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly IndicatorEngine _indicatorEngine;
+    private readonly IIndicatorSnapshotStore _snapshotStore;
+    private readonly SymbolMapper _symbolMapper;
 
     public AlertWorker(
         IConnectionMultiplexer redis,
         IOptions<WorkerOptions> options,
         IAlertProcessingStore processingStore,
+        IndicatorEngine indicatorEngine,
+        IIndicatorSnapshotStore snapshotStore,
+        SymbolMapper symbolMapper,
         ILogger<AlertWorker> logger)
     {
         _redis = redis;
         _options = options.Value;
         _processingStore = processingStore;
+        _indicatorEngine = indicatorEngine;
+        _snapshotStore = snapshotStore;
+        _symbolMapper = symbolMapper;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
@@ -66,6 +76,25 @@ public sealed class AlertWorker : BackgroundService
                         alert.Tv.Ticker,
                         alert.Tv.Interval);
 
+                    var symbol = string.IsNullOrWhiteSpace(alert.Intent.SymbolHint)
+                        ? alert.Tv.Ticker
+                        : alert.Intent.SymbolHint;
+                    symbol = _symbolMapper.Resolve(alert.Tv.Exchange, symbol);
+                    var input = new IndicatorInput(
+                        alert.AlertId,
+                        Guid.NewGuid(),
+                        symbol,
+                        alert.Intent.DirectionHint,
+                        DateTimeOffset.UtcNow);
+
+                    var snapshotResult = await _indicatorEngine.ComputeAsync(input, stoppingToken);
+                    if (!snapshotResult.Ok || snapshotResult.Value is null)
+                    {
+                        var errorMessage = snapshotResult.Error?.Message ?? "Indicator snapshot computation failed.";
+                        throw new InvalidOperationException(errorMessage);
+                    }
+
+                    await _snapshotStore.UpsertAsync(snapshotResult.Value, stoppingToken);
                     await _processingStore.UpsertAsync(alert, "succeeded", null, stoppingToken);
                 }
                 catch (Exception ex)

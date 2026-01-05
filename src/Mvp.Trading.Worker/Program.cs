@@ -5,6 +5,7 @@ using Npgsql;
 using StackExchange.Redis;
 using Mvp.Trading.Integrations.Kraken;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Indicators;
 
 namespace Mvp.Trading.Worker;
 
@@ -37,6 +38,9 @@ public static class Program
         var krakenOptions = builder.Configuration.GetSection("KrakenFutures").Get<KrakenFuturesOptions>() ?? new KrakenFuturesOptions();
         ApplyKrakenEnvironmentOverrides(builder.Configuration, krakenOptions);
         builder.Services.AddSingleton(krakenOptions);
+        var symbolMappingOptions = builder.Configuration.GetSection("SymbolMapping").Get<SymbolMappingOptions>() ?? new SymbolMappingOptions();
+        builder.Services.AddSingleton(symbolMappingOptions);
+        builder.Services.AddSingleton<SymbolMapper>();
         var krakenCacheOptions = builder.Configuration.GetSection("KrakenFutures:Cache").Get<KrakenFuturesCacheOptions>() ?? new KrakenFuturesCacheOptions();
         var krakenRateLimitOptions = builder.Configuration.GetSection("KrakenFutures:RateLimit").Get<KrakenFuturesRateLimitOptions>() ?? new KrakenFuturesRateLimitOptions();
         builder.Services.AddSingleton(krakenCacheOptions);
@@ -45,6 +49,11 @@ public static class Program
         builder.Services.AddMemoryCache();
         builder.Services.AddHttpClient<KrakenFuturesMarketDataProvider>();
         builder.Services.AddSingleton<IMarketDataProvider>(sp => sp.GetRequiredService<KrakenFuturesMarketDataProvider>());
+
+        var indicatorMode = builder.Configuration["Indicator:Mode"] ?? IndicatorDefaults.ScalpingMode;
+        var indicatorConfig = IndicatorDefaults.ForMode(indicatorMode);
+        builder.Services.AddSingleton(indicatorConfig);
+        builder.Services.AddSingleton<IndicatorEngine>();
 
         builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
         {
@@ -69,6 +78,7 @@ public static class Program
         });
 
         builder.Services.AddSingleton<IAlertProcessingStore, PostgresAlertProcessingStore>();
+        builder.Services.AddSingleton<IIndicatorSnapshotStore, PostgresIndicatorSnapshotStore>();
         builder.Services.AddSingleton<IOpenTradeRepository, PostgresOpenTradeRepository>();
         builder.Services.AddHostedService<AlertWorker>();
         builder.Services.AddHostedService<TradeMonitorWorker>();

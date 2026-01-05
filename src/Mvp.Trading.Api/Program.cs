@@ -17,6 +17,7 @@ builder.Services.AddSingleton<IAlertStore, PostgresAlertStore>();
 builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 builder.Services.AddSingleton<IAlertProcessingQuery, PostgresAlertProcessingQuery>();
 builder.Services.AddSingleton<IOpenTradeCommand, PostgresOpenTradeCommand>();
+builder.Services.AddSingleton<IIndicatorSnapshotQuery, PostgresIndicatorSnapshotQuery>();
 builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
@@ -156,6 +157,19 @@ app.MapGet("/alerts/status/{idempotencyKey}", async (
     .WithTags("Alerts")
     .WithSummary("Get processing status for an alert.")
     .WithDescription("Returns the latest processing status for the given idempotency key.");
+
+app.MapGet("/alerts/{alertId:guid}/indicator-snapshot", async (
+        Guid alertId,
+        IIndicatorSnapshotQuery query,
+        CancellationToken ct) =>
+    {
+        var json = await query.GetJsonByAlertIdAsync(alertId, ct);
+        return json is null ? Results.NotFound() : Results.Text(json, "application/json");
+    })
+    .WithName("IndicatorSnapshot")
+    .WithTags("Indicators")
+    .WithSummary("Get indicator snapshot for an alert.")
+    .WithDescription("Returns the stored indicator snapshot JSON for the given alert id.");
 
 app.MapPost("/trades/open", async (
         OpenTradeRequest request,

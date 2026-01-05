@@ -17,7 +17,7 @@
   "$defs": {
     "timeframe": {
       "type": "string",
-      "enum": ["M1", "M5", "M15", "H1", "H4", "D1"]
+      "enum": ["M1", "M5", "M15", "M30", "H1", "H2", "H4", "H12", "D1"]
     },
     "rsiState": {
       "type": "object",
