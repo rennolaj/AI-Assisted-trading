@@ -8,7 +8,7 @@
 
 ## Epics and Stories
 
-### M0 - Scaffolding and Contracts
+### M0 - Scaffolding and Contracts ✅
 **Goal**: establish repo structure, shared contracts, and CI skeleton.
 - Story M0.1: Create solution structure (src/tests/docs/schemas)
 - Story M0.2: Define shared DTOs and result/error envelopes
@@ -16,7 +16,7 @@
 - Story M0.4: Establish baseline CI workflow (build + test)
 **Done when**: repo builds in CI, test project exists, schemas are versioned
 
-### M1 - TradingView Ingestion
+### M1 - TradingView Ingestion ✅
 **Goal**: fast ACK webhook ingress with idempotent enqueueing.
 - Story M1.1: Implement webhook endpoint with shared-secret auth
 - Story M1.2: Normalize payload to AlertEvent and persist raw payload
@@ -24,14 +24,14 @@
 - Story M1.4: Idempotency by IdempotencyKey
 **Done when**: valid alert enqueues within 3s; invalid payloads rejected; duplicates do not re-run
 
-### M2 - Kraken Futures (Read-Only)
+### M2 - Kraken Futures (Read-Only) ✅
 **Goal**: market data access with caching and rate-limit budgeting.
 - Story M2.1: Implement market data connector (instruments, tickers, candles)
 - Story M2.2: Add rate-limit budget tracking and safe backoff
 - Story M2.3: Add caching for public endpoints
 **Done when**: integration tests pass against demo public endpoints; budget respected
 
-### M3 - Indicator Snapshot
+### M3 - Indicator Snapshot ✅
 **Goal**: deterministic, multi-timeframe indicator computation.
 - Story M3.1: Implement RSI/Stoch RSI/MACD/Volume rules
 - Story M3.2: Snapshot serialization and schema validation
