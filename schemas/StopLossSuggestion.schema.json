@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "StopLossSuggestion.schema.json",
+  "title": "StopLossSuggestion",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["anchor", "suggestedStopPrice", "notes"],
+  "properties": {
+    "anchor": { "type": "string" },
+    "suggestedStopPrice": { "type": ["number", "null"] },
+    "notes": { "type": ["string", "null"] }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "mcp": {
+    "tools": {
+      "adjudicateElliott": {
+        "model": "gpt-4.1-mini",
+        "temperature": 0.2,
+        "maxOutputTokens": 500
+      },
+      "explainStopLoss": {
+        "model": "gpt-4.1-mini",
+        "temperature": 0.2,
+        "maxOutputTokens": 300
+      }
+    }
+  },
+  "schemaVersions": {
+    "llmDecision": "1.0",
+    "stopLossSuggestion": "1.0"
+  }
+}

@@ -1,4 +1,5 @@
 using System;
+using Mvp.Trading.Contracts;
 using Mvp.Trading.Elliott;
 using Xunit;
 
@@ -12,8 +13,13 @@ public sealed class LookbackSizerTests
     [Fact]
     public void ComputeLookbackBars_ClampsToMin()
     {
-        var options = new ElliottOptions();
-        var result = LookbackSizer.ComputeLookbackBars(10, options);
+        var options = new ElliottOptions
+        {
+            LookbackDays = 1,
+            MinBars = 200,
+            MaxBars = 5000
+        };
+        var result = LookbackSizer.ComputeLookbackBars(Timeframe.M15, 10, options);
 
         Assert.Equal(options.MinBars, result);
     }
@@ -21,17 +27,41 @@ public sealed class LookbackSizerTests
     [Fact]
     public void ComputeLookbackBars_ClampsToMax()
     {
-        var options = new ElliottOptions();
-        var result = LookbackSizer.ComputeLookbackBars(200, options);
+        var options = new ElliottOptions
+        {
+            LookbackDays = 10,
+            MinBars = 1,
+            MaxBars = 500
+        };
+        var result = LookbackSizer.ComputeLookbackBars(Timeframe.M1, 10, options);
 
         Assert.Equal(options.MaxBars, result);
     }
 
     [Fact]
-    public void ComputeLookbackBars_ReturnsComputedValue()
+    public void ComputeLookbackBars_ReturnsDayBasedValue()
     {
-        var options = new ElliottOptions();
-        var result = LookbackSizer.ComputeLookbackBars(30, options);
+        var options = new ElliottOptions
+        {
+            LookbackDays = 1,
+            MinBars = 1,
+            MaxBars = 5000
+        };
+        var result = LookbackSizer.ComputeLookbackBars(Timeframe.M15, 10, options);
+
+        Assert.Equal(96, result);
+    }
+
+    [Fact]
+    public void ComputeLookbackBars_ReturnsLegacyDepthValue()
+    {
+        var options = new ElliottOptions
+        {
+            LookbackDays = 0,
+            MinBars = 1,
+            MaxBars = 5000
+        };
+        var result = LookbackSizer.ComputeLookbackBars(Timeframe.M15, 30, options);
 
         Assert.Equal(1100, result);
     }
@@ -41,6 +71,6 @@ public sealed class LookbackSizerTests
     {
         var options = new ElliottOptions();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => LookbackSizer.ComputeLookbackBars(0, options));
+        Assert.Throws<ArgumentOutOfRangeException>(() => LookbackSizer.ComputeLookbackBars(Timeframe.M15, 0, options));
     }
 }

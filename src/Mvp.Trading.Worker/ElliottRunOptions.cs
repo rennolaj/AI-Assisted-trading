@@ -11,6 +11,8 @@ public sealed class ElliottRunOptions
 
     public ElliottParametersOptions Parameters { get; set; } = new();
 
+    public int LookbackDays { get; set; } = 1;
+
     public decimal TickSizeFallback { get; set; } = 0m;
 
     public Dictionary<string, decimal> TickSizeOverrides { get; set; } = new();

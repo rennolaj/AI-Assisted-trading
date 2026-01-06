@@ -37,6 +37,9 @@ Example: `PI_XBTUSD` (Bitcoin perpetual futures).
 | `KRAKEN_FUTURES_TEST_SYMBOL` | `PI_XBTUSD` |
 | `KRAKEN_FUTURES_INTEGRATION_TESTS` | `1` |
 | `TRADING_ENABLED` | `0` |
+| `MARKETDATA_MODE` | `fixtures` |
+| `MARKETDATA_FIXTURE_PATH` | `fixtures/kraken-futures` |
+| `MARKETDATA_EXTEND_FIXTURES` | `true` |
 
 ## Secrets (excluded)
 `KRAKEN_FUTURES_API_KEY` and `KRAKEN_FUTURES_API_SECRET` are required only for private endpoints and must never be committed to source control.
@@ -44,3 +47,4 @@ Example: `PI_XBTUSD` (Bitcoin perpetual futures).
 ## Final notes
 With this configuration complete, the MVP can validate Kraken Futures public integration.
 Only secure API credentials remain to enable private trading operations.
+For demo E2E validation, `MARKETDATA_MODE=fixtures` keeps execution on Kraken demo while using fixture OHLCV for indicators.

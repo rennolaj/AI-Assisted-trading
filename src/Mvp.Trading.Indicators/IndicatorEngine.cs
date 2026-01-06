@@ -96,7 +96,9 @@ public sealed class IndicatorEngine
 
     private async Task<TimeframeAnalysisResult> FetchCandlesAsync(string symbol, Timeframe timeframe, DateTimeOffset evaluationTime, CancellationToken ct)
     {
-        var result = await _marketData.GetOhlcvAsync(symbol, timeframe, _config.LookbackBars, ct);
+        var targetBars = GetTargetBars(timeframe);
+        var requiredBars = GetRequiredBars(targetBars);
+        var result = await _marketData.GetOhlcvAsync(symbol, timeframe, requiredBars, ct);
         if (!result.Ok || result.Value is null)
         {
             return new TimeframeAnalysisResult(result, null);
@@ -107,13 +109,12 @@ public sealed class IndicatorEngine
             .ToList();
 
         var closed = FilterClosed(candles, timeframe, evaluationTime);
-        var analysis = AnalyzeTimeframe(timeframe, closed);
+        var analysis = AnalyzeTimeframe(timeframe, closed, requiredBars);
         return new TimeframeAnalysisResult(result, analysis);
     }
 
-    private TimeframeAnalysis AnalyzeTimeframe(Timeframe timeframe, IReadOnlyList<Candle> candles)
+    private TimeframeAnalysis AnalyzeTimeframe(Timeframe timeframe, IReadOnlyList<Candle> candles, int requiredBars)
     {
-        var requiredBars = GetRequiredBars();
         if (candles.Count < requiredBars)
         {
             return TimeframeAnalysis.CreateInsufficient(timeframe);
@@ -486,14 +487,37 @@ public sealed class IndicatorEngine
         _ => 1
     };
 
-    private int GetRequiredBars()
+    private int GetTargetBars(Timeframe timeframe)
+    {
+        if (_config.LookbackDays > 0)
+        {
+            var bars = BarsPerDay(timeframe) * _config.LookbackDays;
+            return Math.Max(1, bars);
+        }
+
+        return Math.Max(1, _config.LookbackBars);
+    }
+
+    private static int BarsPerDay(Timeframe timeframe)
+    {
+        var minutes = TimeframeToMinutes(timeframe);
+        if (minutes <= 0)
+        {
+            return 1;
+        }
+
+        return Math.Max(1, 1440 / minutes);
+    }
+
+    private int GetRequiredBars(int targetBars)
     {
         var rsiRequired = _config.Parameters.RsiPeriod + 1;
         var stochRequired = _config.Parameters.RsiPeriod + _config.Parameters.StochRsiPeriod + _config.StochRsiKPeriod + _config.StochRsiDPeriod;
         var macdRequired = _config.Parameters.MacdSlow + _config.Parameters.MacdSignal + 1;
         var volumeRequired = _config.Parameters.VolumeRule.Period + 1;
 
-        return Math.Max(_config.LookbackBars, Math.Max(Math.Max(rsiRequired, stochRequired), Math.Max(macdRequired, volumeRequired)));
+        var minimum = Math.Max(Math.Max(rsiRequired, stochRequired), Math.Max(macdRequired, volumeRequired));
+        return Math.Max(targetBars, minimum);
     }
 
     private decimal? ComputeVolumeRatio(IReadOnlyList<decimal> volumes)

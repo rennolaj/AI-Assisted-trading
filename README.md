@@ -20,30 +20,33 @@ docker compose up --build
 ```
 Set `KRAKEN_FUTURES_ENV=demo` (sandbox) or `KRAKEN_FUTURES_ENV=prod` (live) in `.env` to switch Kraken Futures environments.
 Endpoint defaults live in `config/kraken-futures.json`.
+Set `OPENAI_API_KEY` in `.env` for MCP adjudication (keep it local, never commit secrets).
+Set `MCP_PROVIDER=openai|local|auto` to choose OpenAI, a local LLM, or OpenAI with local fallback on 429.
+When using a local LLM, configure `LOCAL_LLM_BASE_URL` and optionally `LOCAL_LLM_MODEL_OVERRIDE`.
+For LM Studio, use `LOCAL_LLM_BASE_URL=http://localhost:1234/v1/` and `LOCAL_LLM_MODE=chat`.
+See `docs/local-llm-options.md` for local runtime/model notes.
 
 ## Smoke test (ngrok)
 This uses `scripts/smoke.sh` plus a local `.env.smoke` file (not committed).
 
-1) Start ngrok and copy the forwarding URL:
+1) Create `.env.smoke` with your TradingView secret and smoke inputs:
 ```bash
-ngrok http 8080
-```
-
-2) Create `.env.smoke` with your ngrok host and secret:
-```bash
-BASE_URL=https://your-ngrok-host.ngrok-free.dev
 TRADINGVIEW_WEBHOOK_SECRET=your-secret-here
 SYMBOL_HINT=BTCUSD.P
 TICKER=BTCUSD.P
 EXCHANGE=krakenfutures
 INTERVAL=1
 SLEEP_SECONDS=3
+SMOKE_TIMEOUT_SECONDS=300
+NGROK_AUTOSTART=1
 ```
 
-3) Start API + worker using the smoke env file (does not touch dev config):
+2) Start API + worker using the smoke env file (does not touch dev config):
 ```bash
 docker compose --env-file .env.smoke up -d --build api worker
 ```
+
+3) The script will start ngrok automatically (port 8080) and stop it after the timeout.
 
 4) In TradingView, load `tests/pineScript/mvp-smoke-test-alerts.pine` and create an alert:
 - Webhook URL: `https://your-ngrok-host.ngrok-free.dev/webhooks/tradingview/your-secret-here`
@@ -90,6 +93,19 @@ The output defaults to `tests/fixtures/kraken-futures/<symbol>_m<interval>.json`
 - `Postgres:ConnectionString`
 - `Redis:ConnectionString`
 - `Redis:AlertQueueKey` (default: `mvp:alerts`)
+- `OpenAI:ApiKey`
+- `OpenAI:BaseUrl`
+- `OpenAI:Organization`
+- `OpenAI:Project`
+- `McpProvider:Provider`
+- `McpProvider:FallbackOnOpenAi429`
+- `LocalLlm:BaseUrl`
+- `LocalLlm:ApiKey`
+- `LocalLlm:ResponsesPath`
+- `LocalLlm:ChatCompletionsPath`
+- `LocalLlm:Mode`
+- `LocalLlm:UseResponseFormat`
+- `LocalLlm:ModelOverride`
 - `Worker:PollIntervalMs`
 - `KrakenFutures:Environment`
 - `KrakenFutures:BaseUrl`

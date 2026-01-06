@@ -1,12 +1,17 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using StackExchange.Redis;
+using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Integrations.Kraken;
 using Mvp.Trading.Contracts;
 using Mvp.Trading.Elliott;
+using Mvp.Trading.Execution;
 using Mvp.Trading.Indicators;
+using Mvp.Trading.Risk;
 
 namespace Mvp.Trading.Worker;
 
@@ -21,6 +26,7 @@ public static class Program
 
         builder.Configuration
             .AddJsonFile("config/kraken-futures.json", optional: true, reloadOnChange: true)
+            .AddJsonFile("config/symbol-mapping.json", optional: true, reloadOnChange: true)
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
             .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables();
@@ -48,8 +54,29 @@ public static class Program
         builder.Services.AddSingleton(krakenRateLimitOptions);
         builder.Services.AddSingleton<KrakenFuturesRateLimitBudget>();
         builder.Services.AddMemoryCache();
+        var marketDataOptions = builder.Configuration.GetSection("MarketData").Get<MarketDataOptions>() ?? new MarketDataOptions();
+        builder.Services.AddSingleton(marketDataOptions);
         builder.Services.AddHttpClient<KrakenFuturesMarketDataProvider>();
-        builder.Services.AddSingleton<IMarketDataProvider>(sp => sp.GetRequiredService<KrakenFuturesMarketDataProvider>());
+        builder.Services.AddSingleton<KrakenFuturesMarketDataProvider>();
+        builder.Services.AddSingleton(sp =>
+        {
+            var options = sp.GetRequiredService<MarketDataOptions>();
+            var fallback = sp.GetRequiredService<KrakenFuturesMarketDataProvider>();
+            var logger = sp.GetRequiredService<ILogger<FixtureMarketDataProvider>>();
+            return new FixtureMarketDataProvider(fallback, options, logger);
+        });
+        builder.Services.AddSingleton<IMarketDataProvider>(sp =>
+        {
+            var options = sp.GetRequiredService<MarketDataOptions>();
+            if (options.UseFixtures)
+            {
+                return sp.GetRequiredService<FixtureMarketDataProvider>();
+            }
+
+            return sp.GetRequiredService<KrakenFuturesMarketDataProvider>();
+        });
+        builder.Services.AddHttpClient<KrakenFuturesTradingProvider>();
+        builder.Services.AddSingleton<ITradingProvider>(sp => sp.GetRequiredService<KrakenFuturesTradingProvider>());
 
         var elliottRunOptions = builder.Configuration.GetSection("Elliott").Get<ElliottRunOptions>() ?? new ElliottRunOptions();
         var elliottBaseTimeframe = ParseTimeframe(elliottRunOptions.BaseTimeframe, Timeframe.M15);
@@ -71,6 +98,7 @@ public static class Program
 
         var elliottOptions = new ElliottOptions
         {
+            LookbackDays = Math.Max(0, elliottRunOptions.LookbackDays),
             TickSizeFallback = elliottRunOptions.TickSizeFallback,
             TickSizeOverrides = tickOverrides
         };
@@ -85,8 +113,60 @@ public static class Program
 
         var indicatorMode = builder.Configuration["Indicator:Mode"] ?? IndicatorDefaults.ScalpingMode;
         var indicatorConfig = IndicatorDefaults.ForMode(indicatorMode);
+        if (int.TryParse(builder.Configuration["Indicator:LookbackDays"], out var indicatorLookbackDays))
+        {
+            indicatorConfig = indicatorConfig with { LookbackDays = Math.Max(0, indicatorLookbackDays) };
+        }
+
+        if (int.TryParse(builder.Configuration["Indicator:LookbackBars"], out var indicatorLookbackBars))
+        {
+            indicatorConfig = indicatorConfig with { LookbackBars = Math.Max(1, indicatorLookbackBars) };
+        }
         builder.Services.AddSingleton(indicatorConfig);
         builder.Services.AddSingleton<IndicatorEngine>();
+
+        builder.Services.AddSingleton<IAccountStateProvider, FileAccountStateProvider>();
+        builder.Services.AddSingleton<IInstrumentSpecProvider, FileInstrumentSpecProvider>();
+        builder.Services.AddSingleton<IExecutionSettingsProvider, FileExecutionSettingsProvider>();
+        builder.Services.AddSingleton<ITradePlanBuilder, TradePlanBuilder>();
+        builder.Services.AddSingleton<ITradePlanStore, PostgresTradePlanStore>();
+        builder.Services.AddSingleton<IExecutionIntentStore, PostgresExecutionIntentStore>();
+        builder.Services.AddSingleton<IOrderReceiptStore, PostgresOrderReceiptStore>();
+        builder.Services.AddSingleton<IExecutionHeartbeatStore, PostgresExecutionHeartbeatStore>();
+        builder.Services.AddSingleton<IExecutionService, ExecutionService>();
+
+        builder.Services.Configure<OpenAiOptions>(builder.Configuration.GetSection("OpenAI"));
+        builder.Services.Configure<LocalLlmOptions>(builder.Configuration.GetSection("LocalLlm"));
+        builder.Services.Configure<McpProviderOptions>(builder.Configuration.GetSection("McpProvider"));
+        builder.Services.AddHttpClient<IOpenAiResponsesClient, OpenAiResponsesClient>((sp, client) =>
+        {
+            var options = sp.GetRequiredService<IOptions<OpenAiOptions>>().Value;
+            var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl) ? "https://api.openai.com/v1/" : options.BaseUrl;
+            if (!baseUrl.EndsWith('/'))
+            {
+                baseUrl += "/";
+            }
+
+            client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+        });
+        builder.Services.AddHttpClient<ILocalLlmResponsesClient, LocalLlmResponsesClient>((sp, client) =>
+        {
+            var options = sp.GetRequiredService<IOptions<LocalLlmOptions>>().Value;
+            var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl) ? "http://localhost:11434/v1/" : options.BaseUrl;
+            if (!baseUrl.EndsWith('/'))
+            {
+                baseUrl += "/";
+            }
+
+            client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+        });
+        builder.Services.AddSingleton<IJsonSchemaValidator, JsonSchemaValidator>();
+        builder.Services.AddSingleton<OpenAiMcpGateway>();
+        builder.Services.AddSingleton<LocalLlmMcpGateway>();
+        builder.Services.AddSingleton<IMcpGateway, McpGatewayRouter>();
+        builder.Services.AddSingleton<IMcpConfigStore, FileMcpConfigStore>();
+        builder.Services.AddSingleton<IPolicyStore, FilePolicyStore>();
+        builder.Services.AddSingleton<IPromptTemplateStore, FilePromptTemplateStore>();
 
         builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
         {

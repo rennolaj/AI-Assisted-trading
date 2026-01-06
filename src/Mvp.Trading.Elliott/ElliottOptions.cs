@@ -17,7 +17,12 @@ public sealed class ElliottOptions
     /// <summary>
     /// Minimum number of bars to request for pivot extraction.
     /// </summary>
-    public int MinBars { get; init; } = 800;
+    public int MinBars { get; init; } = 1;
+
+    /// <summary>
+    /// Number of lookback days to request per timeframe.
+    /// </summary>
+    public int LookbackDays { get; init; } = 1;
 
     /// <summary>
     /// Multiplier applied to Depth for lookback sizing.

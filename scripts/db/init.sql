@@ -67,3 +67,68 @@ create table if not exists elliott_candidates (
 );
 
 create index if not exists elliott_candidates_symbol_idx on elliott_candidates (symbol);
+
+create table if not exists trade_plan (
+    plan_id uuid primary key,
+    alert_id uuid references alerts(alert_id),
+    created_at_utc timestamptz not null,
+    plan_json jsonb not null
+);
+
+create index if not exists trade_plan_alert_idx on trade_plan (alert_id);
+
+create table if not exists execution_intent (
+    execution_id uuid primary key,
+    plan_id uuid not null references trade_plan(plan_id),
+    mode text not null,
+    status text not null,
+    created_at_utc timestamptz not null
+);
+
+create index if not exists execution_intent_plan_idx on execution_intent (plan_id);
+
+create table if not exists order_receipt (
+    receipt_id uuid primary key,
+    execution_id uuid not null references execution_intent(execution_id),
+    order_kind text not null,
+    client_order_id text not null,
+    exchange_order_id text,
+    status text not null,
+    qty numeric,
+    price numeric,
+    created_at_utc timestamptz not null
+);
+
+create index if not exists order_receipt_execution_idx on order_receipt (execution_id);
+
+create table if not exists fill_receipt (
+    receipt_id uuid primary key,
+    execution_id uuid not null references execution_intent(execution_id),
+    exchange_order_id text,
+    fill_qty numeric not null,
+    fill_price numeric not null,
+    fee_amount numeric,
+    created_at_utc timestamptz not null
+);
+
+create index if not exists fill_receipt_execution_idx on fill_receipt (execution_id);
+
+create table if not exists reconciliation_state (
+    execution_id uuid primary key references execution_intent(execution_id),
+    status text not null,
+    details text,
+    last_checked_utc timestamptz not null
+);
+
+create table if not exists daily_risk (
+    risk_date date primary key,
+    equity numeric not null,
+    planned_risk numeric not null,
+    updated_at_utc timestamptz not null
+);
+
+create table if not exists execution_heartbeat (
+    service_name text primary key,
+    last_beat_utc timestamptz not null,
+    stale_threshold_seconds int not null
+);

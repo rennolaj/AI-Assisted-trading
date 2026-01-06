@@ -1,0 +1,7 @@
+{
+  "mode": "KRAKEN_DEMO",
+  "slippageCapPct": 0.0025,
+  "heartbeatIntervalSeconds": 10,
+  "staleThresholdSeconds": 30,
+  "maxOrderRetries": 1
+}

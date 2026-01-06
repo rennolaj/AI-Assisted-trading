@@ -63,7 +63,7 @@ public sealed class ElliottFuturesFixtureTests
     [Fact]
     public async Task Engine_FuturesTrades_M1_YieldsCandidates()
     {
-        var fixture = LoadFixture("fixtures/kraken-futures/pi_xbtusd_m1.json");
+        var fixture = LoadFixture("fixtures/kraken-futures/pi_xbtusd_m1_varied.json");
         var candles = fixture.Candles;
         var evaluationTime = candles[^1].OpenTimeUtc.AddMinutes(fixture.IntervalMinutes);
 

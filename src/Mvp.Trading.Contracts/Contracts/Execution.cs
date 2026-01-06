@@ -48,3 +48,26 @@ public sealed record CancelAck(string Result);
 /// Response to a dead-man's switch request.
 /// </summary>
 public sealed record DeadMansSwitchAck(int TimeoutSeconds);
+
+/// <summary>
+/// Receipt for a single order submission.
+/// </summary>
+public sealed record OrderReceipt(
+    string ClientOrderId,
+    string? ExchangeOrderId,
+    string Status,
+    decimal? Qty,
+    decimal? Price);
+
+/// <summary>
+/// Execution receipt for a trade plan.
+/// </summary>
+public sealed record ExecutionReceipt(
+    Guid ExecutionId,
+    Guid PlanId,
+    string Mode,
+    string Status,
+    DateTimeOffset CreatedAtUtc,
+    OrderReceipt Entry,
+    OrderReceipt? Stop,
+    string? Notes);

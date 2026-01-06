@@ -22,6 +22,7 @@
     <None Include="..\fixtures\kraken-spot\xxbtzusd_m15.json" Link="fixtures\kraken-spot\xxbtzusd_m15.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\kraken-futures\pi_xbtusd_m15.json" Link="fixtures\kraken-futures\pi_xbtusd_m15.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\kraken-futures\pi_xbtusd_m1.json" Link="fixtures\kraken-futures\pi_xbtusd_m1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\kraken-futures\pi_xbtusd_m1_varied.json" Link="fixtures\kraken-futures\pi_xbtusd_m1_varied.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\kraken-futures\pf_ethusd_m1_long.json" Link="fixtures\kraken-futures\pf_ethusd_m1_long.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

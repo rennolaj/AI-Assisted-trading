@@ -6,58 +6,56 @@
   "additionalProperties": false,
   "required": [
     "planId",
+    "symbol",
     "side",
-    "entry",
-    "stopLoss",
-    "margin",
+    "timeframe",
+    "entryType",
+    "entryReferencePrice",
+    "entryLimitPrice",
+    "quantity",
+    "stopLossPrice",
+    "plannedRiskAmount",
+    "takeProfitTargets",
+    "riskPolicyVersion",
+    "policyHash",
+    "candidateId",
+    "decisionReceipt",
     "createdAtUtc"
   ],
   "properties": {
     "planId": { "type": "string", "format": "uuid" },
+    "symbol": { "type": "string" },
     "side": { "type": "string" },
-    "entry": { "$ref": "#/$defs/entrySpec" },
-    "stopLoss": { "$ref": "#/$defs/stopSpec" },
-    "takeProfit": { "$ref": "#/$defs/takeProfitSpec" },
-    "margin": { "$ref": "#/$defs/marginSpec" },
+    "timeframe": {
+      "type": "string",
+      "enum": ["M1", "M5", "M15", "M30", "H1", "H2", "H4", "H12", "D1"]
+    },
+    "entryType": { "type": "string" },
+    "entryReferencePrice": { "type": "number" },
+    "entryLimitPrice": { "type": "number" },
+    "quantity": { "type": "number" },
+    "stopLossPrice": { "type": "number" },
+    "plannedRiskAmount": { "type": "number" },
+    "takeProfitTargets": {
+      "type": "array",
+      "minItems": 3,
+      "items": { "$ref": "#/$defs/takeProfitTarget" }
+    },
+    "riskPolicyVersion": { "type": "string" },
+    "policyHash": { "type": "string" },
+    "candidateId": { "type": "string" },
+    "decisionReceipt": { "type": "string" },
     "createdAtUtc": { "type": "string", "format": "date-time" }
   },
   "$defs": {
-    "entrySpec": {
+    "takeProfitTarget": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type", "price", "maxSlippageBps"],
+      "required": ["price", "quantity", "reason"],
       "properties": {
-        "type": { "type": "string" },
-        "price": { "type": ["number", "null"] },
-        "maxSlippageBps": { "type": "integer" }
-      }
-    },
-    "stopSpec": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["type", "price", "reason"],
-      "properties": {
-        "type": { "type": "string" },
         "price": { "type": "number" },
+        "quantity": { "type": "number" },
         "reason": { "type": "string" }
-      }
-    },
-    "takeProfitSpec": {
-      "type": ["object", "null"],
-      "additionalProperties": false,
-      "required": ["type", "price"],
-      "properties": {
-        "type": { "type": "string" },
-        "price": { "type": ["number", "null"] }
-      }
-    },
-    "marginSpec": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["leverage", "notional"],
-      "properties": {
-        "leverage": { "type": "number" },
-        "notional": { "type": ["number", "null"] }
       }
     }
   }

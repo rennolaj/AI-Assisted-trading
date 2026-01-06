@@ -82,7 +82,7 @@ public sealed class ElliottEngine : IElliottEngine
             return new ElliottCandidates(baseTimeframe, Array.Empty<ElliottCandidate>());
         }
 
-        var lookbackBars = LookbackSizer.ComputeLookbackBars(parameters.Depth, _options);
+        var lookbackBars = LookbackSizer.ComputeLookbackBars(baseTimeframe, parameters.Depth, _options);
         var candleResult = await _marketData.GetOhlcvAsync(symbol, baseTimeframe, lookbackBars, ct);
         if (!candleResult.Ok || candleResult.Value is null)
         {

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ExecutionReceipt.schema.json",
+  "title": "ExecutionReceipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "executionId",
+    "planId",
+    "mode",
+    "status",
+    "createdAtUtc",
+    "entry"
+  ],
+  "properties": {
+    "executionId": { "type": "string" },
+    "planId": { "type": "string" },
+    "mode": { "type": "string" },
+    "status": { "type": "string" },
+    "createdAtUtc": { "type": "string", "format": "date-time" },
+    "entry": { "$ref": "#/$defs/orderReceipt" },
+    "stop": { "$ref": "#/$defs/orderReceipt" },
+    "notes": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "orderReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clientOrderId", "status", "qty", "price"],
+      "properties": {
+        "clientOrderId": { "type": "string" },
+        "exchangeOrderId": { "type": ["string", "null"] },
+        "status": { "type": "string" },
+        "qty": { "type": ["number", "null"] },
+        "price": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

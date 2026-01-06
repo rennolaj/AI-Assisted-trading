@@ -8,10 +8,13 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Api.Services;
 using Mvp.Trading.Contracts;
 using Mvp.Trading.Elliott;
+using Mvp.Trading.Execution;
 using Mvp.Trading.Indicators;
+using Mvp.Trading.Risk;
 using Mvp.Trading.Worker;
 using Npgsql;
 using NpgsqlTypes;
@@ -61,7 +64,7 @@ public sealed class ElliottPipelineIntegrationTests
         var payload = JsonSerializer.Serialize(alert);
         await db.ListRightPushAsync(queueKey, payload);
 
-        var fixture = LoadFixture("fixtures/kraken-futures/pi_xbtusd_m1.json");
+        var fixture = LoadFixture("fixtures/kraken-futures/pi_xbtusd_m1_varied.json");
         var marketData = new FixtureMarketDataProvider(fixture.Candles);
 
         var indicatorConfig = BuildIndicatorConfig(fixture.Candles.Count);
@@ -107,6 +110,13 @@ public sealed class ElliottPipelineIntegrationTests
         var elliottStore = new PostgresElliottCandidatesStore(dataSource);
         var logger = LoggerFactory.Create(builder => { }).CreateLogger<AlertWorker>();
 
+        var mcpGateway = new StubMcpGateway();
+        var policyStore = new StubPolicyStore();
+        var mcpConfigStore = new StubMcpConfigStore();
+        var tradePlanBuilder = new StubTradePlanBuilder();
+        var executionService = new StubExecutionService();
+        var mcpOptions = Options.Create(new McpProviderOptions());
+
         var worker = new AlertWorker(
             redisConnection,
             workerOptions,
@@ -116,6 +126,12 @@ public sealed class ElliottPipelineIntegrationTests
             elliottEngine,
             elliottStore,
             elliottConfig,
+            mcpGateway,
+            policyStore,
+            mcpConfigStore,
+            tradePlanBuilder,
+            executionService,
+            mcpOptions,
             symbolMapper,
             logger);
 
@@ -184,6 +200,7 @@ public sealed class ElliottPipelineIntegrationTests
             AnchorTimeframe: Timeframe.M1,
             TrendTimeframe: Timeframe.M1,
             LookbackBars: Math.Max(lookbackBars, 30),
+            LookbackDays: 0,
             EvaluationWindowMinutes: 60,
             EvaluationIntervalMinutes: 1,
             SnapshotPrecision: 6,
@@ -371,6 +388,97 @@ delete from idempotency_keys where idempotency_key = @key;";
                 : _candles.ToList();
 
             return Task.FromResult(new Result<IReadOnlyList<Candle>>(true, slice, null));
+        }
+    }
+
+    private sealed class StubMcpGateway : IMcpGateway
+    {
+        public Task<Result<LlmDecision>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
+        {
+            var candidateId = input.Candidates.Candidates.FirstOrDefault()?.CandidateId;
+            var decision = new LlmDecision("ALLOWLONGW3", 0.9m, candidateId, "WAVEINVALIDATION", "stub");
+            return Task.FromResult(new Result<LlmDecision>(true, decision, null));
+        }
+
+        public Task<Result<StopLossSuggestion>> ExplainStopLossAsync(StopLossExplainInput input, CancellationToken ct)
+        {
+            var suggestion = new StopLossSuggestion("WAVEINVALIDATION", null, "stub");
+            return Task.FromResult(new Result<StopLossSuggestion>(true, suggestion, null));
+        }
+    }
+
+    private sealed class StubPolicyStore : IPolicyStore
+    {
+        public RiskPolicy GetRiskPolicy()
+        {
+            return new RiskPolicy(1m, 5m, 5m, 50000m, "LONG,SHORT");
+        }
+    }
+
+    private sealed class StubMcpConfigStore : IMcpConfigStore
+    {
+        private readonly McpConfiguration _config;
+
+        public StubMcpConfigStore()
+        {
+            _config = new McpConfiguration(
+                new McpToolRegistry(new Dictionary<string, McpToolConfig>(StringComparer.OrdinalIgnoreCase)),
+                new McpSchemaVersions("1.0", "1.0"));
+        }
+
+        public McpConfiguration GetConfig() => _config;
+
+        public McpToolConfig? GetToolConfig(string toolName) => null;
+    }
+
+    private sealed class StubTradePlanBuilder : ITradePlanBuilder
+    {
+        public Result<TradePlan> BuildPlan(TradePlanContext context)
+        {
+            var targets = new[]
+            {
+                new TakeProfitTarget(1.1m, 0.5m, "TP1"),
+                new TakeProfitTarget(1.2m, 0.3m, "TP2"),
+                new TakeProfitTarget(1.3m, 0.2m, "TP3")
+            };
+
+            var plan = new TradePlan(
+                Guid.NewGuid(),
+                context.Snapshot.Symbol,
+                "LONG",
+                context.Candidates.BaseTimeframe,
+                "LIMIT_IOC",
+                1m,
+                1m,
+                1m,
+                0.9m,
+                0.1m,
+                targets,
+                "1.0",
+                "stub",
+                context.Decision.ChosenCandidateId ?? "cand",
+                "receipt",
+                context.EvaluationTimeUtc);
+
+            return new Result<TradePlan>(true, plan, null);
+        }
+    }
+
+    private sealed class StubExecutionService : IExecutionService
+    {
+        public Task<Result<ExecutionReceipt>> ExecuteAsync(ExecutionRequest request, CancellationToken ct)
+        {
+            var entry = new OrderReceipt("entry", null, "FILLED", request.Plan.Quantity, request.Plan.EntryLimitPrice);
+            var receipt = new ExecutionReceipt(
+                Guid.NewGuid(),
+                request.Plan.PlanId,
+                "SIMULATED",
+                "SIMULATED_FILLED",
+                request.Plan.CreatedAtUtc,
+                entry,
+                null,
+                "stub");
+            return Task.FromResult(new Result<ExecutionReceipt>(true, receipt, null));
         }
     }
 }

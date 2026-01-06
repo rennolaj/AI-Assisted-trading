@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Mvp.Trading.Contracts;
 
@@ -18,30 +19,24 @@ public sealed record RiskPolicy(
 /// </summary>
 public sealed record TradePlan(
     Guid PlanId,
+    string Symbol,
     string Side,
-    EntrySpec Entry,
-    StopSpec StopLoss,
-    TakeProfitSpec? TakeProfit,
-    MarginSpec Margin,
+    Timeframe Timeframe,
+    string EntryType,
+    decimal EntryReferencePrice,
+    decimal EntryLimitPrice,
+    decimal Quantity,
+    decimal StopLossPrice,
+    decimal PlannedRiskAmount,
+    IReadOnlyList<TakeProfitTarget> TakeProfitTargets,
+    string RiskPolicyVersion,
+    string PolicyHash,
+    string CandidateId,
+    string DecisionReceipt,
     DateTimeOffset CreatedAtUtc
 );
 
 /// <summary>
-/// Entry order details for a trade plan.
+/// Partial take-profit target for a trade plan.
 /// </summary>
-public sealed record EntrySpec(string Type, decimal? Price, int MaxSlippageBps);
-
-/// <summary>
-/// Stop-loss order details for a trade plan.
-/// </summary>
-public sealed record StopSpec(string Type, decimal Price, string Reason);
-
-/// <summary>
-/// Optional take-profit order details for a trade plan.
-/// </summary>
-public sealed record TakeProfitSpec(string Type, decimal? Price);
-
-/// <summary>
-/// Margin and leverage details for a trade plan.
-/// </summary>
-public sealed record MarginSpec(decimal Leverage, decimal? Notional);
+public sealed record TakeProfitTarget(decimal Price, decimal Quantity, string Reason);

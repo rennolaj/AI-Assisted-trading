@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Api.Models;
 using Mvp.Trading.Api.Services;
 using Mvp.Trading.Contracts;
@@ -12,6 +13,38 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<TradingViewOptions>(builder.Configuration.GetSection("TradingView"));
 builder.Services.Configure<PostgresOptions>(builder.Configuration.GetSection("Postgres"));
 builder.Services.Configure<RedisOptions>(builder.Configuration.GetSection("Redis"));
+builder.Services.Configure<OpenAiOptions>(builder.Configuration.GetSection("OpenAI"));
+builder.Services.Configure<LocalLlmOptions>(builder.Configuration.GetSection("LocalLlm"));
+builder.Services.Configure<McpProviderOptions>(builder.Configuration.GetSection("McpProvider"));
+builder.Services.AddHttpClient<IOpenAiResponsesClient, OpenAiResponsesClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<OpenAiOptions>>().Value;
+    var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl) ? "https://api.openai.com/v1/" : options.BaseUrl;
+    if (!baseUrl.EndsWith('/'))
+    {
+        baseUrl += "/";
+    }
+
+    client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+});
+builder.Services.AddHttpClient<ILocalLlmResponsesClient, LocalLlmResponsesClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<LocalLlmOptions>>().Value;
+    var baseUrl = string.IsNullOrWhiteSpace(options.BaseUrl) ? "http://localhost:11434/v1/" : options.BaseUrl;
+    if (!baseUrl.EndsWith('/'))
+    {
+        baseUrl += "/";
+    }
+
+    client.BaseAddress = new Uri(baseUrl, UriKind.Absolute);
+});
+builder.Services.AddSingleton<IJsonSchemaValidator, JsonSchemaValidator>();
+builder.Services.AddSingleton<OpenAiMcpGateway>();
+builder.Services.AddSingleton<LocalLlmMcpGateway>();
+builder.Services.AddSingleton<IMcpGateway, McpGatewayRouter>();
+builder.Services.AddSingleton<IMcpConfigStore, FileMcpConfigStore>();
+builder.Services.AddSingleton<IPolicyStore, FilePolicyStore>();
+builder.Services.AddSingleton<IPromptTemplateStore, FilePromptTemplateStore>();
 builder.Services.AddSingleton<IAlertQueue, RedisAlertQueue>();
 builder.Services.AddSingleton<IAlertStore, PostgresAlertStore>();
 builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();

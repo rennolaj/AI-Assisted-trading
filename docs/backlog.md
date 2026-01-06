@@ -54,19 +54,26 @@
 - Story M4.X.4: Implement invalidation buffer and tick rounding
 - Story M4.X.5: Align RuleViolation.details to string with stable JSON encoding
 
-### M5 - MCP Server and LLM Adjudication
+### M5 - MCP Server and LLM Adjudication ✅
 **Goal**: MCP resources/tools with strict LLM decision schema.
-- Story M5.1: MCP server resources (config and state URIs)
+- Story M5.1: Embedded MCP host (in-process) with clean gateway boundary
 - Story M5.2: MCP tools (adjudicateElliott, explainStopLoss)
 - Story M5.3: OpenAI Responses integration with strict schema validation
+- Story M5.4: File-based policy/config loader (risk-policy.json, prompts/*.md)
+- Story M5.5: Orchestration tests + fail-closed matrix
 **Done when**: schema-valid LlmDecision enforced 100 percent; invalid outputs fail closed
 
 ### M6 - Risk Engine and Demo Execution
 **Goal**: deterministic TradePlan and demo execution with guardrails.
-- Story M6.1: Risk policy enforcement and sizing
-- Story M6.2: ExecutionService with dead-man's switch heartbeat
-- Story M6.3: Persist receipts and reconciliation state
-**Done when**: demo E2E run places entry/stop and full audit chain exists
+- Story M6.X: TradePlan partial targets (>=3) added to contract + builder ✅
+- Story M6.1: Risk policy enforcement and sizing ✅
+- Story M6.2: ExecutionService with dead-man's switch heartbeat ✅
+- Story M6.3: Persist receipts and reconciliation state ✅
+- Story M6.4: Route take-profit targets into execution orders ✅
+- Story M6.5: Demo E2E validation run (Kraken demo) + audit chain verification
+- Story M6.O1 (Optional): Make take-profit target multiples + allocation splits config-driven
+- Story M6.O2 (Optional): Allow strategy overrides for target requirements
+**Done when**: demo E2E run places entry/stop, persists receipts, and audit chain exists
 
 ### M7 - Hardening and Observability
 **Goal**: resilience, monitoring, and reconciliation.
@@ -82,3 +89,6 @@
 - Exact .NET SDK version to target for CI
 - Queue provider selection (Redis Streams, RabbitMQ, SQS)
 - Storage choice for audit chain (Postgres preferred in specs)
+- Future: run MCP as separate container instead of embedded
+- Future: additional LLM providers beyond OpenAI/local (Azure OpenAI, etc.)
+- Future: policy/config source (DB or remote store vs file-based)

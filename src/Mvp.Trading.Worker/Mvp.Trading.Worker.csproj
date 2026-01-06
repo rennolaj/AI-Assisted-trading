@@ -16,17 +16,30 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Mvp.Trading.Api\Mvp.Trading.Api.csproj" ExcludeAssets="contentFiles" />
     <ProjectReference Include="..\Mvp.Trading.Contracts\Mvp.Trading.Contracts.csproj" />
     <ProjectReference Include="..\Mvp.Trading.Elliott\Mvp.Trading.Elliott.csproj" />
+    <ProjectReference Include="..\Mvp.Trading.Execution\Mvp.Trading.Execution.csproj" />
     <ProjectReference Include="..\Mvp.Trading.Indicators\Mvp.Trading.Indicators.csproj" />
     <ProjectReference Include="..\Mvp.Trading.Integrations.Kraken\Mvp.Trading.Integrations.Kraken.csproj" />
+    <ProjectReference Include="..\Mvp.Trading.Risk\Mvp.Trading.Risk.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\..\config\kraken-futures.json" Link="config/kraken-futures.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\config\symbol-mapping.json" Link="config/symbol-mapping.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\config\mcp.json" Link="config/mcp.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\config\risk-policy.json" Link="config/risk-policy.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\config\account.json" Link="config/account.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\config\instruments.json" Link="config/instruments.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\config\execution.json" Link="config/execution.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\tests\fixtures\kraken-futures\*.json" Link="fixtures/kraken-futures/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\prompts\adjudicate-elliott.md" Link="prompts/adjudicate-elliott.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\prompts\explain-stoploss.md" Link="prompts/explain-stoploss.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\schemas\*.schema.json" Link="schemas\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="appsettings*.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>
 </Project>

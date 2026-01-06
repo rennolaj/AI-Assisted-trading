@@ -38,8 +38,27 @@ public sealed class TradeMonitorWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await MonitorOnceAsync(stoppingToken);
-            await Task.Delay(_options.TradeMonitorIntervalMs, stoppingToken);
+            try
+            {
+                await MonitorOnceAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Trade monitor iteration failed.");
+            }
+
+            try
+            {
+                await Task.Delay(_options.TradeMonitorIntervalMs, stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
         }
     }
 

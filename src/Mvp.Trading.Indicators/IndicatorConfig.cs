@@ -12,6 +12,7 @@ public sealed record IndicatorConfig(
     Timeframe AnchorTimeframe,
     Timeframe TrendTimeframe,
     int LookbackBars,
+    int LookbackDays,
     int EvaluationWindowMinutes,
     int EvaluationIntervalMinutes,
     int SnapshotPrecision,
