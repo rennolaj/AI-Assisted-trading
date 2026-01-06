@@ -38,12 +38,21 @@
 - Story M3.3: Determinism tests using fixed fixtures
 **Done when**: same inputs yield identical snapshots; fixtures pass
 
-### M4 - Elliott Candidate Generation
+### M4 - Elliott Candidate Generation ✅
 **Goal**: generate candidate counts with rule checks.
 - Story M4.1: Pivot extraction (ZigZag or equivalent)
 - Story M4.2: Candidate generation with rule violations and invalidations
 - Story M4.3: Determinism tests
 **Done when**: candidates are deterministic and bounded; empty candidate list is explicit
+**Coverage**: unit + real-world fixtures (spot/futures), pipeline integration test
+
+### M4 Extra - Gap-Resolved LLD ✅
+**Goal**: implement the addendum decisions for deterministic scoring and invalidation.
+- Story M4.X.1: Enforce timeframe restrictions and EW_TIMEFRAME_UNSUPPORTED behavior
+- Story M4.X.2: Implement lookback sizing and EW_PIVOTS_INSUFFICIENT handling
+- Story M4.X.3: Add scoring/confidence formula with penalties and rounding rules
+- Story M4.X.4: Implement invalidation buffer and tick rounding
+- Story M4.X.5: Align RuleViolation.details to string with stable JSON encoding
 
 ### M5 - MCP Server and LLM Adjudication
 **Goal**: MCP resources/tools with strict LLM decision schema.

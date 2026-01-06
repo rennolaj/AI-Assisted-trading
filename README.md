@@ -77,6 +77,14 @@ export KRAKEN_FUTURES_TEST_SYMBOL=PI_XBTUSD
 ./scripts/test.sh
 ```
 
+## Fixture capture (Kraken Futures history)
+Capture real trade history and aggregate into candles for tests:
+```bash
+SYMBOL=PF_ETHUSD INTERVAL_MINUTES=1 DURATION_SECONDS=600 \
+  ./scripts/fixtures/capture-futures-history.sh
+```
+The output defaults to `tests/fixtures/kraken-futures/<symbol>_m<interval>.json`.
+
 ## Runtime configuration
 - `TradingView:WebhookSecret`
 - `Postgres:ConnectionString`
@@ -99,6 +107,13 @@ export KRAKEN_FUTURES_TEST_SYMBOL=PI_XBTUSD
 - `KrakenFutures:RateLimit:InstrumentsCost`
 - `KrakenFutures:RateLimit:TickersCost`
 - `KrakenFutures:RateLimit:CandlesCost`
+- `Elliott:BaseTimeframe`
+- `Elliott:Parameters:PivotMethod`
+- `Elliott:Parameters:Depth`
+- `Elliott:Parameters:DeviationPct`
+- `Elliott:Parameters:MaxCandidates`
+- `Elliott:TickSizeFallback`
+- `Elliott:TickSizeOverrides` (per-symbol overrides, e.g. `Elliott:TickSizeOverrides:BTCUSD.P=0.5`)
 
 ## Local services
 `./scripts/build.sh` will install and start Postgres/Redis and create the `ai-trading-db` database by default. To disable, set `DEV_BOOTSTRAP=0`.

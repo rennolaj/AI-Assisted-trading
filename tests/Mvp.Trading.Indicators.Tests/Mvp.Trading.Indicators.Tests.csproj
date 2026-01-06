@@ -16,11 +16,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Mvp.Trading.Api\Mvp.Trading.Api.csproj" />
     <ProjectReference Include="..\..\src\Mvp.Trading.Contracts\Mvp.Trading.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Mvp.Trading.Elliott\Mvp.Trading.Elliott.csproj" />
     <ProjectReference Include="..\..\src\Mvp.Trading.Indicators\Mvp.Trading.Indicators.csproj" />
     <ProjectReference Include="..\..\src\Mvp.Trading.Worker\Mvp.Trading.Worker.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\..\schemas\IndicatorSnapshot.schema.json" Link="schemas/IndicatorSnapshot.schema.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\kraken-futures\pi_xbtusd_m1.json" Link="fixtures/kraken-futures/pi_xbtusd_m1.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

@@ -18,6 +18,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Indicators", "s
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Indicators.Tests", "tests\\Mvp.Trading.Indicators.Tests\\Mvp.Trading.Indicators.Tests.csproj", "{EF49D6FD-F5BC-4142-B906-00227E949CC3}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Elliott", "src\\Mvp.Trading.Elliott\\Mvp.Trading.Elliott.csproj", "{AC85F5B1-C691-4F06-AC08-4A8B3B9D3386}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Mvp.Trading.Elliott.Tests", "tests\\Mvp.Trading.Elliott.Tests\\Mvp.Trading.Elliott.Tests.csproj", "{E117037E-4D0C-4A4D-BC1C-8B0197C4E990}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -56,6 +60,14 @@ Global
 		{EF49D6FD-F5BC-4142-B906-00227E949CC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{EF49D6FD-F5BC-4142-B906-00227E949CC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{EF49D6FD-F5BC-4142-B906-00227E949CC3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AC85F5B1-C691-4F06-AC08-4A8B3B9D3386}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AC85F5B1-C691-4F06-AC08-4A8B3B9D3386}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AC85F5B1-C691-4F06-AC08-4A8B3B9D3386}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AC85F5B1-C691-4F06-AC08-4A8B3B9D3386}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E117037E-4D0C-4A4D-BC1C-8B0197C4E990}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E117037E-4D0C-4A4D-BC1C-8B0197C4E990}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E117037E-4D0C-4A4D-BC1C-8B0197C4E990}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E117037E-4D0C-4A4D-BC1C-8B0197C4E990}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

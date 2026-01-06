@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Elliott;
 using Mvp.Trading.Indicators;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -21,6 +22,9 @@ public sealed class AlertWorker : BackgroundService
     private readonly IndicatorEngine _indicatorEngine;
     private readonly IIndicatorSnapshotStore _snapshotStore;
     private readonly SymbolMapper _symbolMapper;
+    private readonly IElliottEngine _elliottEngine;
+    private readonly IElliottCandidatesStore _elliottStore;
+    private readonly ElliottRunConfig _elliottConfig;
 
     public AlertWorker(
         IConnectionMultiplexer redis,
@@ -28,6 +32,9 @@ public sealed class AlertWorker : BackgroundService
         IAlertProcessingStore processingStore,
         IndicatorEngine indicatorEngine,
         IIndicatorSnapshotStore snapshotStore,
+        IElliottEngine elliottEngine,
+        IElliottCandidatesStore elliottStore,
+        ElliottRunConfig elliottConfig,
         SymbolMapper symbolMapper,
         ILogger<AlertWorker> logger)
     {
@@ -36,6 +43,9 @@ public sealed class AlertWorker : BackgroundService
         _processingStore = processingStore;
         _indicatorEngine = indicatorEngine;
         _snapshotStore = snapshotStore;
+        _elliottEngine = elliottEngine;
+        _elliottStore = elliottStore;
+        _elliottConfig = elliottConfig;
         _symbolMapper = symbolMapper;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
@@ -95,6 +105,24 @@ public sealed class AlertWorker : BackgroundService
                     }
 
                     await _snapshotStore.UpsertAsync(snapshotResult.Value, stoppingToken);
+
+                    var elliottCandidates = await _elliottEngine.GenerateCandidatesAsync(
+                        symbol,
+                        _elliottConfig.BaseTimeframe,
+                        _elliottConfig.Parameters,
+                        input.EvaluationTimeUtc,
+                        stoppingToken);
+
+                    await _elliottStore.UpsertAsync(
+                        alert.AlertId,
+                        DateTimeOffset.UtcNow,
+                        input.EvaluationTimeUtc,
+                        symbol,
+                        _elliottConfig.BaseTimeframe,
+                        _elliottConfig.Parameters,
+                        elliottCandidates,
+                        stoppingToken);
+
                     await _processingStore.UpsertAsync(alert, "succeeded", null, stoppingToken);
                 }
                 catch (Exception ex)

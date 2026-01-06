@@ -18,6 +18,7 @@ builder.Services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
 builder.Services.AddSingleton<IAlertProcessingQuery, PostgresAlertProcessingQuery>();
 builder.Services.AddSingleton<IOpenTradeCommand, PostgresOpenTradeCommand>();
 builder.Services.AddSingleton<IIndicatorSnapshotQuery, PostgresIndicatorSnapshotQuery>();
+builder.Services.AddSingleton<IElliottCandidatesQuery, PostgresElliottCandidatesQuery>();
 builder.Services.AddSingleton<NpgsqlDataSource>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
@@ -170,6 +171,19 @@ app.MapGet("/alerts/{alertId:guid}/indicator-snapshot", async (
     .WithTags("Indicators")
     .WithSummary("Get indicator snapshot for an alert.")
     .WithDescription("Returns the stored indicator snapshot JSON for the given alert id.");
+
+app.MapGet("/alerts/{alertId:guid}/elliott-candidates", async (
+        Guid alertId,
+        IElliottCandidatesQuery query,
+        CancellationToken ct) =>
+    {
+        var json = await query.GetJsonByAlertIdAsync(alertId, ct);
+        return json is null ? Results.NotFound() : Results.Text(json, "application/json");
+    })
+    .WithName("ElliottCandidates")
+    .WithTags("Elliott")
+    .WithSummary("Get Elliott candidates for an alert.")
+    .WithDescription("Returns the stored Elliott candidate JSON for the given alert id.");
 
 app.MapPost("/trades/open", async (
         OpenTradeRequest request,

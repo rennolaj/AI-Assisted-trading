@@ -55,3 +55,15 @@ create table if not exists indicator_snapshots (
 );
 
 create index if not exists indicator_snapshots_symbol_idx on indicator_snapshots (symbol);
+
+create table if not exists elliott_candidates (
+    alert_id uuid primary key references alerts(alert_id),
+    computed_at_utc timestamptz not null,
+    evaluation_time_utc timestamptz not null,
+    symbol text not null,
+    base_timeframe text not null,
+    parameters_json jsonb not null,
+    candidates_json jsonb not null
+);
+
+create index if not exists elliott_candidates_symbol_idx on elliott_candidates (symbol);

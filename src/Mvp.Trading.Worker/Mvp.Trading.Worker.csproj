@@ -17,6 +17,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Mvp.Trading.Contracts\Mvp.Trading.Contracts.csproj" />
+    <ProjectReference Include="..\Mvp.Trading.Elliott\Mvp.Trading.Elliott.csproj" />
     <ProjectReference Include="..\Mvp.Trading.Indicators\Mvp.Trading.Indicators.csproj" />
     <ProjectReference Include="..\Mvp.Trading.Integrations.Kraken\Mvp.Trading.Integrations.Kraken.csproj" />
   </ItemGroup>
