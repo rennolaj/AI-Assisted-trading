@@ -107,6 +107,43 @@ curl -X POST http://localhost:8080/trades/open \
   -d '{"exchangeId":"kraken-futures","symbol":"BTCUSD.P","side":"LONG","entryPrice":70000,"invalidationPrice":68000}'
 ```
 
+## Reconciliation System
+The system continuously monitors order state consistency between internal tracking and exchange state:
+
+**Automatic Detection:**
+- Runs every 60 seconds via background worker (configurable via `Reconciliation:IntervalSeconds`)
+- Detects 6 types of discrepancies:
+  - `MISSING_ON_EXCHANGE`: Order placed internally but not found on exchange
+  - `ORPHANED_ON_EXCHANGE`: Order exists on exchange but not tracked internally
+  - `STATUS_MISMATCH`: Order status differs between internal and exchange state
+  - `FILL_MISMATCH`: Fill quantity/price discrepancies
+  - `INVALIDATION_TRIGGERED`: Stop-loss/take-profit triggered but not reflected in status
+  - `ERROR`: Reconciliation process errors
+
+**Manual Resolution:**
+When discrepancies are detected, review them in the database:
+```sql
+-- View recent discrepancies
+SELECT * FROM reconciliation_discrepancy 
+WHERE detected_at > NOW() - INTERVAL '1 hour'
+ORDER BY detected_at DESC;
+
+-- Check reconciliation state
+SELECT * FROM reconciliation_state 
+ORDER BY checked_at DESC LIMIT 10;
+```
+
+**Resolution Steps:**
+1. Investigate the discrepancy details (stored as JSON in `expected_state` and `actual_state` columns)
+2. Verify the actual exchange state using exchange UI or API
+3. Take corrective action:
+   - Cancel orphaned orders on exchange
+   - Update internal state to match exchange reality
+   - Re-submit missing orders if appropriate
+4. Monitor subsequent reconciliation runs to ensure resolution
+
+See `docs/m7-low-level-requirements.md` for detailed technical specifications.
+
 ## Kraken integration tests
 These are disabled by default. To run them against demo endpoints:
 ```bash
@@ -143,6 +180,7 @@ The output defaults to `tests/fixtures/kraken-futures/<symbol>_m<interval>.json`
 - `LocalLlm:UseResponseFormat`
 - `LocalLlm:ModelOverride`
 - `Worker:PollIntervalMs`
+- `Reconciliation:IntervalSeconds` (default: 60)
 - `KrakenFutures:Environment`
 - `KrakenFutures:BaseUrl`
 - `KrakenFutures:AuthBaseUrl`
