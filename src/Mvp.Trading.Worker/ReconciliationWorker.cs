@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Mvp.Trading.Contracts.Telemetry;
 using Mvp.Trading.Execution;
 
 namespace Mvp.Trading.Worker;
@@ -12,17 +13,20 @@ public sealed class ReconciliationWorker : BackgroundService
 {
     private readonly IReconciliationService _reconciliationService;
     private readonly IKillSwitchService _killSwitchService;
+    private readonly IMetricsService _metrics;
     private readonly ReconciliationOptions _options;
     private readonly ILogger<ReconciliationWorker> _logger;
 
     public ReconciliationWorker(
         IReconciliationService reconciliationService,
         IKillSwitchService killSwitchService,
+        IMetricsService metrics,
         IOptions<ReconciliationOptions> options,
         ILogger<ReconciliationWorker> logger)
     {
         _reconciliationService = reconciliationService;
         _killSwitchService = killSwitchService;
+        _metrics = metrics;
         _options = options.Value;
         _logger = logger;
     }
@@ -54,11 +58,27 @@ public sealed class ReconciliationWorker : BackgroundService
                 if (!result.Ok)
                 {
                     _logger.LogError("Reconciliation failed: {Error}", result.Error?.Message);
+                    _metrics.RecordError("ReconciliationWorker", "RECONCILIATION_FAILED");
+                }
+                else if (result.Value is not null)
+                {
+                    // Track discrepancies if any found
+                    var discrepancyCount = result.Value.Discrepancies?.Count ?? 0;
+                    if (discrepancyCount > 0)
+                    {
+                        _logger.LogWarning("Reconciliation found {Count} discrepancies", discrepancyCount);
+                        _metrics.SetReconciliationDiscrepanciesGauge(discrepancyCount);
+                    }
+                    else
+                    {
+                        _metrics.SetReconciliationDiscrepanciesGauge(0);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Reconciliation worker encountered an error");
+                _metrics.RecordError("ReconciliationWorker", ex.GetType().Name);
             }
 
             await Task.Delay(TimeSpan.FromSeconds(_options.PollingIntervalSeconds), stoppingToken);

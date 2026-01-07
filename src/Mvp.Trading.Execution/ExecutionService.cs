@@ -1,8 +1,10 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Contracts.Telemetry;
 using Mvp.Trading.Risk;
 
 namespace Mvp.Trading.Execution;
@@ -20,6 +22,7 @@ public sealed class ExecutionService : IExecutionService
     private readonly IOrderReceiptStore _receiptStore;
     private readonly IExecutionHeartbeatStore _heartbeatStore;
     private readonly ITradingProvider _tradingProvider;
+    private readonly IMetricsService _metrics;
 
     public ExecutionService(
         IExecutionSettingsProvider settingsProvider,
@@ -27,7 +30,8 @@ public sealed class ExecutionService : IExecutionService
         IExecutionIntentStore intentStore,
         IOrderReceiptStore receiptStore,
         IExecutionHeartbeatStore heartbeatStore,
-        ITradingProvider tradingProvider)
+        ITradingProvider tradingProvider,
+        IMetricsService metrics)
     {
         _settingsProvider = settingsProvider;
         _planStore = planStore;
@@ -35,14 +39,19 @@ public sealed class ExecutionService : IExecutionService
         _receiptStore = receiptStore;
         _heartbeatStore = heartbeatStore;
         _tradingProvider = tradingProvider;
+        _metrics = metrics;
     }
 
     public async Task<Result<ExecutionReceipt>> ExecuteAsync(ExecutionRequest request, CancellationToken ct)
     {
+        var stopwatch = Stopwatch.StartNew();
         var settings = _settingsProvider.GetSettings();
         var heartbeat = await _heartbeatStore.UpsertAndCheckAsync(ServiceName, settings.StaleThresholdSeconds, ct);
+        
         if (heartbeat.IsStale)
         {
+            _metrics.RecordExecutionOutcome("rejected_heartbeat");
+            _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
             return Fail("EXECUTION_HEARTBEAT_STALE", "Execution heartbeat is stale; refusing to execute.");
         }
 
@@ -83,15 +92,23 @@ public sealed class ExecutionService : IExecutionService
                 stopReceipt,
                 "simulated execution");
 
+            _metrics.RecordExecutionOutcome("filled");
+            _metrics.RecordOrderPlaced(request.Plan.Side, "MARKET");
+            _metrics.RecordOrderFilled(request.Plan.Symbol, request.Plan.Side);
+            _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
             return new Result<ExecutionReceipt>(true, receipt, null);
         }
 
         if (IsKrakenMode(mode))
         {
-            return await ExecuteKrakenAsync(request, executionId, createdAt, mode, settings, ct);
+            var result = await ExecuteKrakenAsync(request, executionId, createdAt, mode, settings, stopwatch, ct);
+            _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
+            return result;
         }
 
         await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "NOT_IMPLEMENTED", createdAt, ct);
+        _metrics.RecordExecutionOutcome("error");
+        _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
         return Fail("EXECUTION_MODE_UNSUPPORTED", $"Execution mode '{mode}' is not implemented yet.");
     }
 
@@ -121,17 +138,20 @@ public sealed class ExecutionService : IExecutionService
         DateTimeOffset createdAt,
         string mode,
         ExecutionSettings settings,
+        Stopwatch stopwatch,
         CancellationToken ct)
     {
         if (!string.Equals(_tradingProvider.ExchangeId, KrakenExchangeId, StringComparison.OrdinalIgnoreCase))
         {
             await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "PROVIDER_MISMATCH", createdAt, ct);
+            _metrics.RecordExecutionOutcome("error");
             return Fail("EXECUTION_PROVIDER_MISMATCH", "Configured trading provider does not match Kraken Futures.");
         }
 
         if (!TryMapSides(request.Plan.Side, out var entrySide, out var exitSide))
         {
             await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "INVALID_SIDE", createdAt, ct);
+            _metrics.RecordExecutionOutcome("error");
             return Fail("EXECUTION_INVALID_SIDE", $"Unsupported trade side '{request.Plan.Side}'.");
         }
 
@@ -141,6 +161,7 @@ public sealed class ExecutionService : IExecutionService
         if (!deadman.Ok || deadman.Value is null)
         {
             await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "DEADMAN_FAILED", createdAt, ct);
+            _metrics.RecordExecutionOutcome("error");
             return Fail(
                 "EXECUTION_DEADMAN_FAILED",
                 deadman.Error?.Message ?? "Dead-man's switch request failed.");
@@ -166,6 +187,7 @@ public sealed class ExecutionService : IExecutionService
         if (!entryResult.Ok || entryResult.Value is null)
         {
             await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "ENTRY_FAILED", createdAt, ct);
+            _metrics.RecordExecutionOutcome("error");
             return Fail(
                 "EXECUTION_ENTRY_FAILED",
                 entryResult.Error?.Message ?? "Entry order failed.");
@@ -180,6 +202,12 @@ public sealed class ExecutionService : IExecutionService
 
         await _receiptStore.SaveAsync(executionId, "ENTRY", entryReceipt, ct);
         await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "ENTRY_PLACED", createdAt, ct);
+        _metrics.RecordOrderPlaced(request.Plan.Side, entryOrderType.ToUpperInvariant());
+        
+        if (entryResult.Value.Status == "FILLED")
+        {
+            _metrics.RecordOrderFilled(request.Plan.Symbol, request.Plan.Side);
+        }
 
         var stopClientOrderId = $"{executionId}-STOP";
         var stopRequest = new SendOrderRequest(
@@ -201,6 +229,7 @@ public sealed class ExecutionService : IExecutionService
         {
             await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "STOP_FAILED", createdAt, ct);
             await TryCancelAsync(entryResult.Value.OrderId, ct);
+            _metrics.RecordExecutionOutcome("error");
             return Fail(
                 "EXECUTION_STOP_FAILED",
                 stopResult.Error?.Message ?? "Stop order failed.");
@@ -214,6 +243,7 @@ public sealed class ExecutionService : IExecutionService
             request.Plan.StopLossPrice);
 
         await _receiptStore.SaveAsync(executionId, "STOP", stopReceipt, ct);
+        _metrics.RecordOrderPlaced(request.Plan.Side, "STP");
 
         var tpErrors = await PlaceTakeProfitOrdersAsync(executionId, request.Plan, exitSide, settings, ct);
         var status = tpErrors.Count == 0 ? "ORDERS_PLACED" : "ORDERS_PLACED_TP_PARTIAL";
@@ -222,6 +252,10 @@ public sealed class ExecutionService : IExecutionService
             : $"kraken demo execution with {tpErrors.Count} take-profit failures";
 
         await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, status, createdAt, ct);
+
+        // Record successful execution outcome
+        var outcome = entryResult.Value.Status == "FILLED" ? "filled" : "placed";
+        _metrics.RecordExecutionOutcome(outcome);
 
         var receipt = new ExecutionReceipt(
             executionId,
@@ -300,6 +334,7 @@ public sealed class ExecutionService : IExecutionService
             if (!tpResult.Ok || tpResult.Value is null)
             {
                 errors.Add($"TP_{i + 1}_FAILED");
+                _metrics.RecordError("ExecutionService", "TP_PLACEMENT_FAILED");
                 continue;
             }
 
@@ -312,6 +347,7 @@ public sealed class ExecutionService : IExecutionService
 
             var orderKind = $"TAKE_PROFIT_{i + 1}";
             await _receiptStore.SaveAsync(executionId, orderKind, receipt, ct);
+            _metrics.RecordOrderPlaced(plan.Side, "TAKE_PROFIT");
         }
 
         return errors;

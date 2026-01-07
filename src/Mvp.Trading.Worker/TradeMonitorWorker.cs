@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Contracts.Telemetry;
 using Mvp.Trading.Execution;
 
 namespace Mvp.Trading.Worker;
@@ -19,6 +20,7 @@ public sealed class TradeMonitorWorker : BackgroundService
     private readonly IMarketDataProvider _marketData;
     private readonly IOpenTradeRepository _repository;
     private readonly IKillSwitchService _killSwitchService;
+    private readonly IMetricsService _metrics;
     private readonly WorkerOptions _options;
     private readonly ILogger<TradeMonitorWorker> _logger;
 
@@ -26,12 +28,14 @@ public sealed class TradeMonitorWorker : BackgroundService
         IMarketDataProvider marketData,
         IOpenTradeRepository repository,
         IKillSwitchService killSwitchService,
+        IMetricsService metrics,
         IOptions<WorkerOptions> options,
         ILogger<TradeMonitorWorker> logger)
     {
         _marketData = marketData;
         _repository = repository;
         _killSwitchService = killSwitchService;
+        _metrics = metrics;
         _options = options.Value;
         _logger = logger;
     }
@@ -64,6 +68,7 @@ public sealed class TradeMonitorWorker : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Trade monitor iteration failed.");
+                _metrics.RecordError("TradeMonitorWorker", ex.GetType().Name);
             }
 
             try
@@ -80,6 +85,10 @@ public sealed class TradeMonitorWorker : BackgroundService
     private async Task MonitorOnceAsync(CancellationToken ct)
     {
         var trades = await _repository.GetOpenTradesAsync(_marketData.ExchangeId, ct);
+        
+        // Update active trades gauge
+        _metrics.SetActiveTradesGauge(trades.Count);
+        
         if (trades.Count == 0)
         {
             return;
@@ -89,6 +98,7 @@ public sealed class TradeMonitorWorker : BackgroundService
         if (!tickersResult.Ok || tickersResult.Value is null)
         {
             _logger.LogWarning("Failed to fetch tickers for trade monitoring: {Error}", tickersResult.Error?.Message);
+            _metrics.RecordError("TradeMonitorWorker", "TICKER_FETCH_FAILED");
             return;
         }
 
@@ -116,6 +126,7 @@ public sealed class TradeMonitorWorker : BackgroundService
             {
                 await _repository.MarkInvalidatedAsync(trade.TradeId, lastPrice, reason, ct);
                 _logger.LogWarning("Trade {TradeId} invalidated: {Reason}", trade.TradeId, reason);
+                _metrics.RecordStopLossTriggered(trade.Symbol);
                 continue;
             }
 
