@@ -1,0 +1,311 @@
+//@version=6
+indicator("MVP Production Trading Alerts", overlay=true)
+
+// ============================================================================
+// PRODUCTION TRADING ALERT SCRIPT FOR MVP SYSTEM
+// ============================================================================
+// This script generates alerts that align with the MVP trading system's
+// requirements for indicator-based entry signals.
+//
+// Key Requirements (from MVP system):
+// 1. RSI must be in extreme zones (oversold ≤30 for LONG, overbought ≥70 for SHORT)
+// 2. Multiple confirmation signals improve score
+// 3. Multi-timeframe analysis for trend alignment
+// 4. Volume confirmation for strong moves
+// 5. Stochastic RSI reversal patterns
+// 6. MACD momentum alignment
+//
+// Alert Frequency: Only on bar close (barstate.isconfirmed) for reliability
+// Designed for: 5-minute timeframe (adjustable)
+// ============================================================================
+
+// ----------------------
+// Configuration Inputs
+// ----------------------
+// RSI Settings
+rsiPeriod = input.int(14, "RSI Period", minval=5, maxval=50, group="RSI")
+rsiOversold = input.float(30.0, "RSI Oversold Threshold", minval=10, maxval=40, step=1.0, group="RSI")
+rsiOverbought = input.float(70.0, "RSI Overbought Threshold", minval=60, maxval=90, step=1.0, group="RSI")
+
+// Stochastic RSI Settings
+stochRsiPeriod = input.int(14, "Stochastic RSI Period", minval=5, maxval=50, group="Stochastic")
+stochK = input.int(3, "Stochastic %K Smoothing", minval=1, maxval=10, group="Stochastic")
+stochD = input.int(3, "Stochastic %D Smoothing", minval=1, maxval=10, group="Stochastic")
+stochOversold = input.float(20.0, "Stoch Oversold", minval=10, maxval=30, step=1.0, group="Stochastic")
+stochOverbought = input.float(80.0, "Stoch Overbought", minval=70, maxval=90, step=1.0, group="Stochastic")
+
+// MACD Settings
+macdFast = input.int(12, "MACD Fast Length", minval=5, maxval=50, group="MACD")
+macdSlow = input.int(26, "MACD Slow Length", minval=10, maxval=100, group="MACD")
+macdSignal = input.int(9, "MACD Signal Length", minval=3, maxval=20, group="MACD")
+
+// Trend Settings (higher timeframe)
+trendMaFast = input.int(21, "Trend EMA Fast", minval=10, maxval=100, group="Trend")
+trendMaSlow = input.int(50, "Trend EMA Slow", minval=20, maxval=200, group="Trend")
+
+// Volume Settings
+volumePeriod = input.int(20, "Volume SMA Period", minval=10, maxval=50, group="Volume")
+volumeThreshold = input.float(1.2, "Volume Spike Threshold", minval=1.0, maxval=3.0, step=0.1, group="Volume")
+
+// Alert Settings
+minConfirmations = input.int(3, "Minimum Confirmations Required", minval=1, maxval=5, group="Alert Filters", tooltip="Number of confirmation signals required to trigger alert")
+requireTrend = input.bool(true, "Require Trend Alignment", group="Alert Filters", tooltip="Only alert when price aligns with higher timeframe trend")
+requireVolume = input.bool(false, "Require Volume Confirmation", group="Alert Filters", tooltip="Only alert when volume spike is present")
+
+// Symbol Configuration
+symbolHint = input.string("BTCUSD.P", "Symbol Hint", group="Webhook Config")
+exchangeName = input.string("krakenfutures", "Exchange", group="Webhook Config")
+
+// ----------------------
+// Indicator Calculations
+// ----------------------
+
+// RSI - Anchor timeframe
+rsi = ta.rsi(close, rsiPeriod)
+
+// Stochastic RSI
+rsiForStoch = ta.rsi(close, stochRsiPeriod)
+stochRsi = ta.stoch(rsiForStoch, rsiForStoch, rsiForStoch, stochRsiPeriod)
+stochRsiK = ta.sma(stochRsi, stochK)
+stochRsiD = ta.sma(stochRsiK, stochD)
+
+// Previous values for crossover detection
+prevStochK = stochRsiK[1]
+prevStochD = stochRsiD[1]
+
+// MACD
+[macdLine, signalLine, histLine] = ta.macd(close, macdFast, macdSlow, macdSignal)
+prevHist = histLine[1]
+
+// Trend - EMAs
+emaFast = ta.ema(close, trendMaFast)
+emaSlow = ta.ema(close, trendMaSlow)
+isUptrend = emaFast > emaSlow
+isDowntrend = emaFast < emaSlow
+
+// Volume
+volumeAvg = ta.sma(volume, volumePeriod)
+volumeRatio = volumeAvg > 0 ? volume / volumeAvg : 0
+hasVolumeSpike = volumeRatio >= volumeThreshold
+
+// ----------------------
+// Confirmation Signals
+// ----------------------
+
+// 1. RSI Extreme (Gate - Required)
+rsiOversoldZone = rsi <= rsiOversold
+rsiOverboughtZone = rsi >= rsiOverbought
+
+// 2. RSI Multi-Timeframe Alignment (use current timeframe as proxy)
+// In production, the backend fetches multiple timeframes
+// Here we check RSI consistency over recent bars
+rsiMultiTfLong = rsi <= rsiOversold and rsi[1] <= rsiOversold + 5
+rsiMultiTfShort = rsi >= rsiOverbought and rsi[1] >= rsiOverbought - 5
+
+// 3. Stochastic RSI Reversal
+stochReversalLong = (prevStochK <= stochOversold and prevStochD <= stochOversold) and 
+                    (prevStochK <= prevStochD) and (stochRsiK > stochRsiD)
+
+stochReversalShort = (prevStochK >= stochOverbought and prevStochD >= stochOverbought) and 
+                     (prevStochK >= prevStochD) and (stochRsiK < stochRsiD)
+
+// 4. MACD Momentum
+macdMomentumLong = macdLine > signalLine and histLine > 0 and histLine > prevHist
+macdMomentumShort = macdLine < signalLine and histLine < 0 and histLine < prevHist
+
+// 5. Trend Alignment
+trendAlignedLong = isUptrend
+trendAlignedShort = isDowntrend
+
+// 6. Volume Confirmation
+volumeConfirmed = hasVolumeSpike
+
+// ----------------------
+// Count Confirmations
+// ----------------------
+
+countLongConfirmations = 0
+if rsiMultiTfLong
+    countLongConfirmations += 1
+if stochReversalLong
+    countLongConfirmations += 1
+if macdMomentumLong
+    countLongConfirmations += 1
+if trendAlignedLong
+    countLongConfirmations += 1
+if volumeConfirmed
+    countLongConfirmations += 1
+
+countShortConfirmations = 0
+if rsiMultiTfShort
+    countShortConfirmations += 1
+if stochReversalShort
+    countShortConfirmations += 1
+if macdMomentumShort
+    countShortConfirmations += 1
+if trendAlignedShort
+    countShortConfirmations += 1
+if volumeConfirmed
+    countShortConfirmations += 1
+
+// ----------------------
+// Entry Conditions
+// ----------------------
+
+// LONG Setup: RSI oversold + minimum confirmations
+longSetup = rsiOversoldZone and 
+            countLongConfirmations >= minConfirmations and
+            (not requireTrend or trendAlignedLong) and
+            (not requireVolume or volumeConfirmed)
+
+// SHORT Setup: RSI overbought + minimum confirmations  
+shortSetup = rsiOverboughtZone and 
+             countShortConfirmations >= minConfirmations and
+             (not requireTrend or trendAlignedShort) and
+             (not requireVolume or volumeConfirmed)
+
+// ----------------------
+// Visualization
+// ----------------------
+
+// Plot RSI levels for reference
+bgcolor(rsiOversoldZone ? color.new(color.green, 95) : na, title="RSI Oversold Zone")
+bgcolor(rsiOverboughtZone ? color.new(color.red, 95) : na, title="RSI Overbought Zone")
+
+// Plot EMAs for trend
+plot(emaFast, "EMA Fast", color=color.new(color.blue, 50), linewidth=1)
+plot(emaSlow, "EMA Slow", color=color.new(color.orange, 50), linewidth=2)
+
+// Mark setup signals on chart
+plotshape(longSetup, "Long Signal", shape.triangleup, location.belowbar, 
+          color=color.new(color.green, 0), size=size.small, text="LONG")
+plotshape(shortSetup, "Short Signal", shape.triangledown, location.abovebar, 
+          color=color.new(color.red, 0), size=size.small, text="SHORT")
+
+// ----------------------
+// Alert Labels
+// ----------------------
+
+// Build confirmation string for logging
+var string longConfirmStr = ""
+var string shortConfirmStr = ""
+
+if longSetup
+    longConfirmStr := ""
+    if rsiMultiTfLong
+        longConfirmStr += "RSI_MULTITF,"
+    if stochReversalLong
+        longConfirmStr += "STOCH_REVERSAL,"
+    if macdMomentumLong
+        longConfirmStr += "MACD_MOMENTUM,"
+    if trendAlignedLong
+        longConfirmStr += "TREND_ALIGNED,"
+    if volumeConfirmed
+        longConfirmStr += "VOLUME_SPIKE,"
+    
+if shortSetup
+    shortConfirmStr := ""
+    if rsiMultiTfShort
+        shortConfirmStr += "RSI_MULTITF,"
+    if stochReversalShort
+        shortConfirmStr += "STOCH_REVERSAL,"
+    if macdMomentumShort
+        shortConfirmStr += "MACD_MOMENTUM,"
+    if trendAlignedShort
+        shortConfirmStr += "TREND_ALIGNED,"
+    if volumeConfirmed
+        shortConfirmStr += "VOLUME_SPIKE,"
+
+// ----------------------
+// JSON Payload Builder
+// ----------------------
+
+f_num(_v) =>
+    na(_v) ? "null" : str.tostring(_v, "#.########")
+
+f_idempotencyKey(_direction) =>
+    str.format("{0}-{1}-{2}-{3}", 
+               symbolHint, 
+               timeframe.period, 
+               _direction, 
+               str.tostring(time_close))
+
+f_json(_direction, _confirmations, _confirmCount) =>
+    str.format(
+        '{"idempotencyKey":"%s","ticker":"%s","exchange":"%s","interval":"%s","close":%s,"volume":%s,"directionHint":"%s","symbolHint":"%s","reason":"MVP_PRODUCTION_SIGNAL","confirmations":"%s","confirmationCount":%s,"rsi":%s,"stochK":%s,"stochD":%s,"macd":%s,"macdSignal":%s,"macdHist":%s,"emaFast":%s,"emaSlow":%s}',
+        f_idempotencyKey(_direction),
+        symbolHint,
+        exchangeName,
+        timeframe.period,
+        f_num(close),
+        f_num(volume),
+        _direction,
+        symbolHint,
+        _confirmations,
+        str.tostring(_confirmCount),
+        f_num(rsi),
+        f_num(stochRsiK),
+        f_num(stochRsiD),
+        f_num(macdLine),
+        f_num(signalLine),
+        f_num(histLine),
+        f_num(emaFast),
+        f_num(emaSlow)
+    )
+
+// ----------------------
+// Fire Alerts (Bar Close Only)
+// ----------------------
+
+if barstate.isconfirmed
+    if longSetup
+        alert(f_json("LONG", longConfirmStr, countLongConfirmations), alert.freq_once_per_bar_close)
+    
+    if shortSetup
+        alert(f_json("SHORT", shortConfirmStr, countShortConfirmations), alert.freq_once_per_bar_close)
+
+// ----------------------
+// Table for Current Status
+// ----------------------
+
+var table statusTable = table.new(position.top_right, 2, 10, bgcolor=color.new(color.black, 85), 
+                                   border_width=1, border_color=color.gray)
+
+if barstate.islast
+    table.cell(statusTable, 0, 0, "Indicator", text_color=color.white, text_size=size.small)
+    table.cell(statusTable, 1, 0, "Value", text_color=color.white, text_size=size.small)
+    
+    table.cell(statusTable, 0, 1, "RSI", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 1, str.tostring(rsi, "#.##"), 
+               text_color=rsiOversoldZone ? color.green : (rsiOverboughtZone ? color.red : color.white), 
+               text_size=size.tiny)
+    
+    table.cell(statusTable, 0, 2, "Stoch K/D", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 2, str.tostring(stochRsiK, "#.##") + "/" + str.tostring(stochRsiD, "#.##"), 
+               text_color=color.white, text_size=size.tiny)
+    
+    table.cell(statusTable, 0, 3, "MACD Hist", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 3, str.tostring(histLine, "#.####"), 
+               text_color=histLine > 0 ? color.green : color.red, text_size=size.tiny)
+    
+    table.cell(statusTable, 0, 4, "Trend", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 4, isUptrend ? "UP" : (isDowntrend ? "DOWN" : "NEUTRAL"), 
+               text_color=isUptrend ? color.green : (isDowntrend ? color.red : color.gray), 
+               text_size=size.tiny)
+    
+    table.cell(statusTable, 0, 5, "Volume", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 5, str.tostring(volumeRatio, "#.##") + "x", 
+               text_color=hasVolumeSpike ? color.yellow : color.white, text_size=size.tiny)
+    
+    table.cell(statusTable, 0, 6, "LONG Confirms", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 6, str.tostring(countLongConfirmations) + "/5", 
+               text_color=longSetup ? color.green : color.white, text_size=size.tiny)
+    
+    table.cell(statusTable, 0, 7, "SHORT Confirms", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 7, str.tostring(countShortConfirmations) + "/5", 
+               text_color=shortSetup ? color.red : color.white, text_size=size.tiny)
+    
+    table.cell(statusTable, 0, 8, "Status", text_color=color.gray, text_size=size.tiny)
+    table.cell(statusTable, 1, 8, longSetup ? "LONG SIGNAL" : (shortSetup ? "SHORT SIGNAL" : "NO SIGNAL"), 
+               text_color=longSetup ? color.green : (shortSetup ? color.red : color.gray), 
+               text_size=size.tiny)
