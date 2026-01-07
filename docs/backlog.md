@@ -31,6 +31,14 @@
 - Story M2.3: Add caching for public endpoints
 **Done when**: integration tests pass against demo public endpoints; budget respected
 
+### M2 Follow-up - Kraken Futures Candle Gap (Pending)
+**Goal**: ensure indicator snapshots have enough OHLC data per timeframe.
+- Story M2.F1: Document API findings (history returns trades only, ~100 max) ✅
+- Story M2.F2: Integrate Charts API candles (`/api/charts/v1/{tick_type}/{symbol}/{resolution}`) ✅
+- Story M2.F3: Add charts base URL config + symbol discovery cache ✅
+- Story M2.F4: Add exchange-level max bars config + explicit fallback behavior ✅
+**Done when**: indicator pipeline can reliably meet minimum bars or uses an agreed low-data mode.
+
 ### M3 - Indicator Snapshot ✅
 **Goal**: deterministic, multi-timeframe indicator computation.
 - Story M3.1: Implement RSI/Stoch RSI/MACD/Volume rules
@@ -53,6 +61,8 @@
 - Story M4.X.3: Add scoring/confidence formula with penalties and rounding rules
 - Story M4.X.4: Implement invalidation buffer and tick rounding
 - Story M4.X.5: Align RuleViolation.details to string with stable JSON encoding
+- Story M4.X.6: Add Elliott profile selection (conservative/aggressive) with fallback on pivots insufficient
+- Story M4.X.7: Allow config-driven profile mapping (base + fallback) tied to indicator risk category
 
 ### M5 - MCP Server and LLM Adjudication ✅
 **Goal**: MCP resources/tools with strict LLM decision schema.
@@ -63,17 +73,18 @@
 - Story M5.5: Orchestration tests + fail-closed matrix
 **Done when**: schema-valid LlmDecision enforced 100 percent; invalid outputs fail closed
 
-### M6 - Risk Engine and Demo Execution
+### M6 - Risk Engine and Demo Execution ✅
 **Goal**: deterministic TradePlan and demo execution with guardrails.
 - Story M6.X: TradePlan partial targets (>=3) added to contract + builder ✅
 - Story M6.1: Risk policy enforcement and sizing ✅
 - Story M6.2: ExecutionService with dead-man's switch heartbeat ✅
 - Story M6.3: Persist receipts and reconciliation state ✅
 - Story M6.4: Route take-profit targets into execution orders ✅
-- Story M6.5: Demo E2E validation run (Kraken demo) + audit chain verification
+- Story M6.5: Demo E2E validation run (Kraken demo) + audit chain verification ✅
 - Story M6.O1 (Optional): Make take-profit target multiples + allocation splits config-driven
 - Story M6.O2 (Optional): Allow strategy overrides for target requirements
 **Done when**: demo E2E run places entry/stop, persists receipts, and audit chain exists
+**Coverage**: E2E validation infrastructure complete, rejection path validated, ForceAllow feature tested
 
 ### M7 - Hardening and Observability
 **Goal**: resilience, monitoring, and reconciliation.

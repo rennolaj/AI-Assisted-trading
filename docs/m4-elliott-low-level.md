@@ -16,7 +16,7 @@ Out of scope:
 
 ## Inputs
 - `baseTimeframe`: schema-supported only (`M1`, `M5`, `M15`, `H1`, `H4`, `D1`).
-- `ElliottParameters`: `PivotMethod`, `Depth`, `DeviationPct`, `MaxCandidates`.
+- `ElliottParameters`: `PivotMethod`, `Depth`, `DeviationPct`, `MaxCandidates`, optional `ProfileName`.
 - `symbol`: market symbol used for lookups and ID hashing.
 - `evaluationTimeUtc`: explicit evaluation time; use closed bars only.
 

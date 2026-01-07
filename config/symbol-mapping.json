@@ -1,7 +1,5 @@
 {
   "SymbolMapping": {
-    "KrakenFutures": {
-      "BTCUSD.P": "PI_XBTUSD"
-    }
+    "KrakenFutures": {}
   }
 }

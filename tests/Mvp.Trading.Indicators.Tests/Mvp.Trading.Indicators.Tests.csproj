@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <None Include="..\..\schemas\IndicatorSnapshot.schema.json" Link="schemas/IndicatorSnapshot.schema.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\fixtures\kraken-futures\pi_xbtusd_m1.json" Link="fixtures/kraken-futures/pi_xbtusd_m1.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="..\fixtures\kraken-futures\pi_xbtusd_m1_varied.json" Link="fixtures/kraken-futures/pi_xbtusd_m1_varied.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\kraken-futures\btcusd_p_m1.json" Link="fixtures/kraken-futures/btcusd_p_m1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\kraken-futures\btcusd_p_m1_varied.json" Link="fixtures/kraken-futures/btcusd_p_m1_varied.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

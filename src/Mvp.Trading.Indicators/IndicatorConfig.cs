@@ -13,6 +13,8 @@ public sealed record IndicatorConfig(
     Timeframe TrendTimeframe,
     int LookbackBars,
     int LookbackDays,
+    IReadOnlyDictionary<Timeframe, int> LookbackBarsByTimeframe,
+    IReadOnlyDictionary<Timeframe, int> LookbackDaysByTimeframe,
     int EvaluationWindowMinutes,
     int EvaluationIntervalMinutes,
     int SnapshotPrecision,

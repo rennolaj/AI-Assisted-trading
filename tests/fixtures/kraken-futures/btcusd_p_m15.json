@@ -1,6 +1,6 @@
 {
   "source": "kraken-futures",
-  "symbol": "PI_XBTUSD",
+  "symbol": "BTCUSD.P",
   "intervalMinutes": 15,
   "capturedAtUtc": "2026-01-06T13:48:05Z",
   "candles": [

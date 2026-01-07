@@ -27,7 +27,8 @@
 ### Public market data
 - Instruments list
 - Tickers snapshot
-- OHLCV history for candles
+- Charts API candles (preferred source for OHLC)
+- Trade history (fallback only; capped to ~100 trades per request)
 
 ### Private trading (later in MVP)
 - Check API key permissions
@@ -38,7 +39,8 @@
 
 ## Safety Rules
 - Cache public endpoints where possible.
-- Do not use TradingView candle data; use Kraken Futures candles for indicators.
+- Use the Charts API for OHLC. Do not rely on `history` for indicator lookbacks.
+- If charts is unavailable, use fixtures or an alternate OHLC provider until a pagination strategy exists.
 - Dead-man's switch must be set and refreshed while trading is enabled.
 
 ## Configuration Keys
@@ -46,7 +48,16 @@
 - `KrakenFutures:BaseUrl`
 - `KrakenFutures:AuthBaseUrl`
 - `KrakenFutures:WebSocketUrl`
+- `KrakenFutures:ChartsBaseUrl`
+- `KrakenFutures:ChartsTickType`
+- `KrakenFutures:ChartsMaxCandlesPerRequest`
+- `KrakenFutures:ChartsMaxBatches`
+- `KrakenFutures:ChartsFallbackToHistory`
 - `KrakenFutures:TestSymbol`
 - `KrakenFutures:ApiKey`
 - `KrakenFutures:ApiSecret`
+- `KrakenFutures:DemoApiKey`
+- `KrakenFutures:DemoApiSecret`
+- `KrakenFutures:ProdApiKey`
+- `KrakenFutures:ProdApiSecret`
 - `KrakenFutures:TimeoutSeconds`

@@ -2,6 +2,6 @@
   "maxAccountRiskPctPerTrade": 1.0,
   "maxDailyLossPct": 5.0,
   "maxLeverage": 5.0,
-  "maxNotional": 50000,
+  "maxNotional": 500000,
   "allowedSides": "LONG,SHORT"
 }

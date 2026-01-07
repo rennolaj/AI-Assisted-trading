@@ -93,7 +93,7 @@ public sealed class KrakenFuturesTradingProvider : ITradingProvider
             return Fail<OrderAck>("VALIDATION", "Size must be greater than zero.");
         }
 
-        var symbol = request.Symbol.Trim().ToUpperInvariant();
+        var symbol = KrakenFuturesSymbolFormatter.Normalize(request.Symbol);
         var side = request.Side.Trim().ToLowerInvariant();
         var orderType = request.OrderType.Trim().ToLowerInvariant();
 

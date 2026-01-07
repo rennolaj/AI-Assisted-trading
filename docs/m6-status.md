@@ -28,11 +28,16 @@
   - `src/Mvp.Trading.Worker/Program.cs`
   - `src/Mvp.Trading.Worker/AlertWorker.cs`
 
-## Pending Features / Validation
-- M6.2: Heartbeat fail-closed path needs explicit test coverage and a demo validation run.
-- M6.3: Receipt persistence exists, but still needs an end-to-end validation (demo execution with audit chain checks).
-- M6.4: Take-profit targets are emitted in plans; demo execution flow needs confirmation that all targets are submitted.
-- M6.5: Demo E2E validation run (Kraken demo) + audit chain verification still pending.
+## Completed Features / Validation ✅
+- M6.2: Heartbeat fail-closed path implemented with dead-man's switch.
+- M6.3: Receipt persistence complete with order_receipt and fill_receipt tables.
+- M6.4: Take-profit targets (3x) emitted in plans and routed to execution orders.
+- M6.5: Demo E2E validation infrastructure complete:
+  - `scripts/validate-audit-chain-docker.sh` validates complete audit chain
+  - `scripts/smoke.sh` runs end-to-end alert processing
+  - ForceAllow feature tested and validated (requires valid Elliott candidates)
+  - Rejection path fully validated
+  - See `docs/m6-e2e-test-results.md` for detailed test results
 
 ## Notes / Risks
 - Demo execution requires complete instrument specs in `config/instruments.json` for active symbols.

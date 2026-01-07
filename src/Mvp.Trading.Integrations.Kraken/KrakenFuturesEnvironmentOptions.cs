@@ -21,6 +21,11 @@ public sealed class KrakenFuturesEnvironmentOptions
     public string WebSocketUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Charts API base URL for OHLC candles.
+    /// </summary>
+    public string ChartsBaseUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Default test symbol for the environment.
     /// </summary>
     public string TestSymbol { get; set; } = string.Empty;

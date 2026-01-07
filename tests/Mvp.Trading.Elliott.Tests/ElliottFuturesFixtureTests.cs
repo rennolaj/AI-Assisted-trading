@@ -20,7 +20,7 @@ public sealed class ElliottFuturesFixtureTests
     [Fact]
     public async Task Engine_FuturesTrades_InsufficientPivots_YieldsSyntheticCandidate()
     {
-        var fixture = LoadFixture("fixtures/kraken-futures/pi_xbtusd_m15.json");
+        var fixture = LoadFixture("fixtures/kraken-futures/btcusd_p_m15.json");
         var candles = fixture.Candles;
         var evaluationTime = candles[^1].OpenTimeUtc.AddMinutes(fixture.IntervalMinutes);
 
@@ -63,7 +63,7 @@ public sealed class ElliottFuturesFixtureTests
     [Fact]
     public async Task Engine_FuturesTrades_M1_YieldsCandidates()
     {
-        var fixture = LoadFixture("fixtures/kraken-futures/pi_xbtusd_m1_varied.json");
+        var fixture = LoadFixture("fixtures/kraken-futures/btcusd_p_m1_varied.json");
         var candles = fixture.Candles;
         var evaluationTime = candles[^1].OpenTimeUtc.AddMinutes(fixture.IntervalMinutes);
 
@@ -165,7 +165,7 @@ public sealed class ElliottFuturesFixtureTests
         using var doc = JsonDocument.Parse(stream);
         var root = doc.RootElement;
 
-        var symbol = root.GetProperty("symbol").GetString() ?? "PI_XBTUSD";
+        var symbol = root.GetProperty("symbol").GetString() ?? "BTCUSD.P";
         var interval = root.GetProperty("intervalMinutes").GetInt32();
         var candles = new List<Candle>();
 

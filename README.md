@@ -36,6 +36,9 @@ SYMBOL_HINT=BTCUSD.P
 TICKER=BTCUSD.P
 EXCHANGE=krakenfutures
 INTERVAL=1
+KRAKEN_FUTURES_ENV=demo
+KRAKEN_FUTURES_DEMO_API_KEY=your-demo-key
+KRAKEN_FUTURES_DEMO_API_SECRET=your-demo-secret
 SLEEP_SECONDS=3
 SMOKE_TIMEOUT_SECONDS=300
 NGROK_AUTOSTART=1
@@ -68,7 +71,7 @@ Example:
 ```bash
 curl -X POST http://localhost:8080/trades/open \
   -H "Content-Type: application/json" \
-  -d '{"exchangeId":"kraken-futures","symbol":"PI_XBTUSD","side":"LONG","entryPrice":70000,"invalidationPrice":68000}'
+  -d '{"exchangeId":"kraken-futures","symbol":"BTCUSD.P","side":"LONG","entryPrice":70000,"invalidationPrice":68000}'
 ```
 
 ## Kraken integration tests
@@ -76,7 +79,7 @@ These are disabled by default. To run them against demo endpoints:
 ```bash
 export KRAKEN_FUTURES_INTEGRATION_TESTS=1
 export KRAKEN_FUTURES_REST_BASE=https://demo-futures.kraken.com/derivatives/api/v3
-export KRAKEN_FUTURES_TEST_SYMBOL=PI_XBTUSD
+export KRAKEN_FUTURES_TEST_SYMBOL=BTCUSD.P
 ./scripts/test.sh
 ```
 
@@ -114,6 +117,10 @@ The output defaults to `tests/fixtures/kraken-futures/<symbol>_m<interval>.json`
 - `KrakenFutures:TestSymbol`
 - `KrakenFutures:ApiKey`
 - `KrakenFutures:ApiSecret`
+- `KrakenFutures:DemoApiKey`
+- `KrakenFutures:DemoApiSecret`
+- `KrakenFutures:ProdApiKey`
+- `KrakenFutures:ProdApiSecret`
 - `KrakenFutures:TimeoutSeconds`
 - `KrakenFutures:Cache:InstrumentsTtlSeconds`
 - `KrakenFutures:Cache:TickersTtlSeconds`

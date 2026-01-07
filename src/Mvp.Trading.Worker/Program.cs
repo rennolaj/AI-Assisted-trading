@@ -81,11 +81,7 @@ public static class Program
         var elliottRunOptions = builder.Configuration.GetSection("Elliott").Get<ElliottRunOptions>() ?? new ElliottRunOptions();
         var elliottBaseTimeframe = ParseTimeframe(elliottRunOptions.BaseTimeframe, Timeframe.M15);
         var parameterOptions = elliottRunOptions.Parameters ?? new ElliottParametersOptions();
-        var elliottParameters = new ElliottParameters(
-            string.IsNullOrWhiteSpace(parameterOptions.PivotMethod) ? "ZigZag" : parameterOptions.PivotMethod,
-            parameterOptions.Depth > 0 ? parameterOptions.Depth : 12,
-            parameterOptions.DeviationPct > 0m ? parameterOptions.DeviationPct : 5m,
-            parameterOptions.MaxCandidates > 0 ? parameterOptions.MaxCandidates : 10);
+        var baseParameters = BuildElliottParameters(parameterOptions, null);
 
         var tickOverrides = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
         foreach (var pair in elliottRunOptions.TickSizeOverrides)
@@ -103,8 +99,10 @@ public static class Program
             TickSizeOverrides = tickOverrides
         };
 
+        var profileSelection = BuildProfileSelection(elliottRunOptions, baseParameters);
+
         builder.Services.AddSingleton(elliottOptions);
-        builder.Services.AddSingleton(new ElliottRunConfig(elliottBaseTimeframe, elliottParameters));
+        builder.Services.AddSingleton(new ElliottRunConfig(elliottBaseTimeframe, baseParameters, profileSelection));
         builder.Services.AddSingleton<IPivotExtractor, ZigZagPivotExtractor>();
         builder.Services.AddSingleton<ImpulseCandidateBuilder>();
         builder.Services.AddSingleton<CandidateScorer>();
@@ -113,6 +111,8 @@ public static class Program
 
         var indicatorMode = builder.Configuration["Indicator:Mode"] ?? IndicatorDefaults.ScalpingMode;
         var indicatorConfig = IndicatorDefaults.ForMode(indicatorMode);
+        var lookbackDaysByTimeframe = ParseIndicatorLookbackMap(builder.Configuration, "Indicator:LookbackDaysByTimeframe");
+        var lookbackBarsByTimeframe = ParseIndicatorLookbackMap(builder.Configuration, "Indicator:LookbackBarsByTimeframe");
         if (int.TryParse(builder.Configuration["Indicator:LookbackDays"], out var indicatorLookbackDays))
         {
             indicatorConfig = indicatorConfig with { LookbackDays = Math.Max(0, indicatorLookbackDays) };
@@ -122,6 +122,12 @@ public static class Program
         {
             indicatorConfig = indicatorConfig with { LookbackBars = Math.Max(1, indicatorLookbackBars) };
         }
+
+        indicatorConfig = indicatorConfig with
+        {
+            LookbackDaysByTimeframe = lookbackDaysByTimeframe,
+            LookbackBarsByTimeframe = lookbackBarsByTimeframe
+        };
         builder.Services.AddSingleton(indicatorConfig);
         builder.Services.AddSingleton<IndicatorEngine>();
 
@@ -231,9 +237,39 @@ public static class Program
             options.WebSocketUrl = envOptions.WebSocketUrl;
         }
 
+        if (!string.IsNullOrWhiteSpace(envOptions.ChartsBaseUrl))
+        {
+            options.ChartsBaseUrl = envOptions.ChartsBaseUrl;
+        }
+
         if (!string.IsNullOrWhiteSpace(envOptions.TestSymbol))
         {
             options.TestSymbol = envOptions.TestSymbol;
+        }
+
+        if (normalized == "demo")
+        {
+            if (!string.IsNullOrWhiteSpace(options.DemoApiKey))
+            {
+                options.ApiKey = options.DemoApiKey;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.DemoApiSecret))
+            {
+                options.ApiSecret = options.DemoApiSecret;
+            }
+        }
+        else if (normalized == "prod")
+        {
+            if (!string.IsNullOrWhiteSpace(options.ProdApiKey))
+            {
+                options.ApiKey = options.ProdApiKey;
+            }
+
+            if (!string.IsNullOrWhiteSpace(options.ProdApiSecret))
+            {
+                options.ApiSecret = options.ProdApiSecret;
+            }
         }
     }
 
@@ -247,6 +283,62 @@ public static class Program
             "demo" => "demo",
             _ => environment.Trim().ToLowerInvariant()
         };
+    }
+
+    private static ElliottParameters BuildElliottParameters(ElliottParametersOptions options, string? profileName)
+    {
+        return new ElliottParameters(
+            string.IsNullOrWhiteSpace(options.PivotMethod) ? "ZigZag" : options.PivotMethod,
+            options.Depth > 0 ? options.Depth : 12,
+            options.DeviationPct > 0m ? options.DeviationPct : 5m,
+            options.MaxCandidates > 0 ? options.MaxCandidates : 10,
+            profileName);
+    }
+
+    private static ElliottProfileSelection BuildProfileSelection(
+        ElliottRunOptions options,
+        ElliottParameters baseParameters)
+    {
+        var selectionOptions = options.ProfileSelection ?? new ElliottProfileSelectionOptions();
+        var profiles = new Dictionary<string, ElliottParameters>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var pair in options.Profiles)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key))
+            {
+                continue;
+            }
+
+            var name = pair.Key.Trim();
+            var profileOptions = pair.Value ?? new ElliottParametersOptions();
+            profiles[name] = BuildElliottParameters(profileOptions, name);
+        }
+
+        var defaultProfile = string.IsNullOrWhiteSpace(selectionOptions.DefaultProfile)
+            ? "default"
+            : selectionOptions.DefaultProfile.Trim();
+
+        if (!profiles.ContainsKey(defaultProfile))
+        {
+            profiles[defaultProfile] = baseParameters with { ProfileName = defaultProfile };
+        }
+
+        var fallbackProfile = string.IsNullOrWhiteSpace(selectionOptions.FallbackProfile)
+            ? null
+            : selectionOptions.FallbackProfile.Trim();
+
+        var riskMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var pair in selectionOptions.RiskCategoryMap)
+        {
+            if (string.IsNullOrWhiteSpace(pair.Key) || string.IsNullOrWhiteSpace(pair.Value))
+            {
+                continue;
+            }
+
+            riskMap[pair.Key.Trim()] = pair.Value.Trim();
+        }
+
+        return new ElliottProfileSelection(defaultProfile, fallbackProfile, riskMap, profiles);
     }
 
     private static Timeframe ParseTimeframe(string? value, Timeframe fallback)
@@ -271,5 +363,94 @@ public static class Program
             _ when Enum.TryParse<Timeframe>(normalized, true, out var parsed) => parsed,
             _ => fallback
         };
+    }
+
+    private static IReadOnlyDictionary<Timeframe, int> ParseIndicatorLookbackMap(
+        IConfiguration configuration,
+        string sectionKey)
+    {
+        var raw = configuration.GetSection(sectionKey).Get<Dictionary<string, int>>()
+            ?? new Dictionary<string, int>();
+        var result = new Dictionary<Timeframe, int>();
+
+        foreach (var pair in raw)
+        {
+            if (pair.Value <= 0)
+            {
+                continue;
+            }
+
+            if (!TryParseTimeframe(pair.Key, out var timeframe))
+            {
+                continue;
+            }
+
+            result[timeframe] = pair.Value;
+        }
+
+        return result;
+    }
+
+    private static bool TryParseTimeframe(string? value, out Timeframe timeframe)
+    {
+        timeframe = default;
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var normalized = value.Trim().ToUpperInvariant();
+        switch (normalized)
+        {
+            case "1":
+            case "M1":
+                timeframe = Timeframe.M1;
+                return true;
+            case "5":
+            case "M5":
+                timeframe = Timeframe.M5;
+                return true;
+            case "15":
+            case "M15":
+                timeframe = Timeframe.M15;
+                return true;
+            case "30":
+            case "M30":
+                timeframe = Timeframe.M30;
+                return true;
+            case "60":
+            case "1H":
+            case "H1":
+                timeframe = Timeframe.H1;
+                return true;
+            case "120":
+            case "2H":
+            case "H2":
+                timeframe = Timeframe.H2;
+                return true;
+            case "240":
+            case "4H":
+            case "H4":
+                timeframe = Timeframe.H4;
+                return true;
+            case "720":
+            case "12H":
+            case "H12":
+                timeframe = Timeframe.H12;
+                return true;
+            case "D":
+            case "1D":
+            case "D1":
+                timeframe = Timeframe.D1;
+                return true;
+        }
+
+        if (Enum.TryParse<Timeframe>(normalized, true, out var parsed))
+        {
+            timeframe = parsed;
+            return true;
+        }
+
+        return false;
     }
 }

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Mvp.Trading.Contracts;
 
 namespace Mvp.Trading.Indicators;
@@ -14,11 +16,16 @@ public sealed class IndicatorEngine
 {
     private readonly IMarketDataProvider _marketData;
     private readonly IndicatorConfig _config;
+    private readonly ILogger<IndicatorEngine> _logger;
 
-    public IndicatorEngine(IMarketDataProvider marketData, IndicatorConfig config)
+    public IndicatorEngine(
+        IMarketDataProvider marketData,
+        IndicatorConfig config,
+        ILogger<IndicatorEngine>? logger = null)
     {
         _marketData = marketData;
         _config = config;
+        _logger = logger ?? NullLogger<IndicatorEngine>.Instance;
     }
 
     public async Task<Result<IndicatorSnapshot>> ComputeAsync(IndicatorInput input, CancellationToken ct)
@@ -109,6 +116,18 @@ public sealed class IndicatorEngine
             .ToList();
 
         var closed = FilterClosed(candles, timeframe, evaluationTime);
+        if (closed.Count < requiredBars)
+        {
+            _logger.LogWarning(
+                "Indicator candles insufficient for {Symbol} {Timeframe}: targetBars={TargetBars} requiredBars={RequiredBars} returnedBars={ReturnedBars} closedBars={ClosedBars} evaluationTime={EvaluationTime}",
+                symbol,
+                timeframe,
+                targetBars,
+                requiredBars,
+                candles.Count,
+                closed.Count,
+                evaluationTime);
+        }
         var analysis = AnalyzeTimeframe(timeframe, closed, requiredBars);
         return new TimeframeAnalysisResult(result, analysis);
     }
@@ -489,6 +508,17 @@ public sealed class IndicatorEngine
 
     private int GetTargetBars(Timeframe timeframe)
     {
+        if (_config.LookbackDaysByTimeframe.TryGetValue(timeframe, out var daysOverride) && daysOverride > 0)
+        {
+            var bars = BarsPerDay(timeframe) * daysOverride;
+            return Math.Max(1, bars);
+        }
+
+        if (_config.LookbackBarsByTimeframe.TryGetValue(timeframe, out var barsOverride) && barsOverride > 0)
+        {
+            return Math.Max(1, barsOverride);
+        }
+
         if (_config.LookbackDays > 0)
         {
             var bars = BarsPerDay(timeframe) * _config.LookbackDays;

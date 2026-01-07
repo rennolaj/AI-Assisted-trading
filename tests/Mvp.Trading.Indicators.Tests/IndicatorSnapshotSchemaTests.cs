@@ -19,7 +19,7 @@ public sealed class IndicatorSnapshotSchemaTests
         var snapshot = new IndicatorSnapshot(
             Guid.Parse("8E6C1277-7F35-4B40-8B68-8B8B6A5E7F7A"),
             Guid.Parse("2F9CE3A6-8A23-4A39-A5B2-9B5F7C2B0A36"),
-            "PI_XBTUSD",
+            "BTCUSD.P",
             IndicatorDefaults.ScalpingMode,
             "LONG",
             Timeframe.M30,

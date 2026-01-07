@@ -35,11 +35,6 @@ public sealed class SymbolMapper
             {
                 return Normalize(mapped);
             }
-
-            if (ShouldPrefixKraken(normalized))
-            {
-                return $"PI_{normalized}";
-            }
         }
 
         return normalized;
@@ -49,17 +44,6 @@ public sealed class SymbolMapper
     {
         return string.IsNullOrWhiteSpace(exchange)
             || exchange.Contains("kraken", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static bool ShouldPrefixKraken(string symbol)
-    {
-        if (symbol.Contains('_', StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        return !symbol.StartsWith("PI_", StringComparison.OrdinalIgnoreCase)
-            && !symbol.StartsWith("PF_", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string Normalize(string value)

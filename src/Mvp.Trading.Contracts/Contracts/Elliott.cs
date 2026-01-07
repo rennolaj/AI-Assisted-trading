@@ -9,7 +9,8 @@ public sealed record ElliottParameters(
     string PivotMethod,
     int Depth,
     decimal DeviationPct,
-    int MaxCandidates
+    int MaxCandidates,
+    string? ProfileName = null
 );
 
 /// <summary>

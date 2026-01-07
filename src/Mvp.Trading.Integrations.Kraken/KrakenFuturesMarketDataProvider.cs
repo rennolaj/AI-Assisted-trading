@@ -18,6 +18,10 @@ namespace Mvp.Trading.Integrations.Kraken;
 public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
 {
     public const string KrakenFuturesExchangeId = "kraken-futures";
+    private const int ChartsMaxCandlesDefault = 500;
+    private const int ChartsMaxBatchesDefault = 10;
+    private const int ChartsSymbolsTtlSeconds = 300;
+    private const int ChartsResolutionsTtlSeconds = 300;
 
     private readonly HttpClient _httpClient;
     private readonly KrakenFuturesCacheOptions _cacheOptions;
@@ -25,6 +29,11 @@ public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
     private readonly KrakenFuturesRateLimitBudget _budget;
     private readonly IMemoryCache _cache;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly string _chartsBaseUrl;
+    private readonly string _chartsTickType;
+    private readonly int _chartsMaxCandlesPerRequest;
+    private readonly int _chartsMaxBatches;
+    private readonly bool _chartsFallbackToHistory;
 
     public KrakenFuturesMarketDataProvider(
         HttpClient httpClient,
@@ -51,6 +60,18 @@ public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
         _httpClient.BaseAddress ??= new Uri(baseUrl, UriKind.Absolute);
         _httpClient.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mvp.Trading/1.0");
+
+        _chartsBaseUrl = ResolveChartsBaseUrl(options);
+        _chartsTickType = string.IsNullOrWhiteSpace(options.ChartsTickType)
+            ? "trade"
+            : options.ChartsTickType.Trim().ToLowerInvariant();
+        _chartsMaxCandlesPerRequest = options.ChartsMaxCandlesPerRequest > 0
+            ? options.ChartsMaxCandlesPerRequest
+            : ChartsMaxCandlesDefault;
+        _chartsMaxBatches = options.ChartsMaxBatches > 0
+            ? options.ChartsMaxBatches
+            : ChartsMaxBatchesDefault;
+        _chartsFallbackToHistory = options.ChartsFallbackToHistory;
 
         _jsonOptions = new JsonSerializerOptions
         {
@@ -169,8 +190,23 @@ public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
                 new Error("VALIDATION", "Lookback bars must be greater than zero.", null));
         }
 
+        if (!string.IsNullOrWhiteSpace(_chartsBaseUrl))
+        {
+            var chartsResult = await TryGetChartsCandlesAsync(symbol, timeframe, lookbackBars, ct);
+            if (chartsResult.Ok && chartsResult.Value is not null && chartsResult.Value.Count > 0)
+            {
+                return chartsResult;
+            }
+
+            if (!_chartsFallbackToHistory)
+            {
+                return chartsResult;
+            }
+        }
+
         var interval = TimeframeToMinutes(timeframe);
-        var cacheKey = $"kraken:candles:{symbol}:{interval}:{lookbackBars}";
+        var apiSymbol = KrakenFuturesSymbolFormatter.Normalize(symbol);
+        var cacheKey = $"kraken:candles:{apiSymbol}:{interval}:{lookbackBars}";
         if (_cache.TryGetValue(cacheKey, out IReadOnlyList<Candle>? cached) && cached is not null)
         {
             return new Result<IReadOnlyList<Candle>>(true, cached, null);
@@ -181,7 +217,7 @@ public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
             return RateLimitError<IReadOnlyList<Candle>>();
         }
 
-        var uri = $"history?symbol={Uri.EscapeDataString(symbol)}&interval={interval}&last={lookbackBars}";
+        var uri = $"history?symbol={Uri.EscapeDataString(apiSymbol)}&interval={interval}&last={lookbackBars}";
         var response = await _httpClient.GetAsync(uri, ct);
         if (!response.IsSuccessStatusCode)
         {
@@ -207,6 +243,302 @@ public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
 
         CacheSet(cacheKey, results, _cacheOptions.CandlesTtlSeconds);
         return new Result<IReadOnlyList<Candle>>(true, results, null);
+    }
+
+    private async Task<Result<IReadOnlyList<Candle>>> TryGetChartsCandlesAsync(
+        string symbol,
+        Timeframe timeframe,
+        int lookbackBars,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(_chartsBaseUrl))
+        {
+            return ChartsError("Charts API base URL not configured.");
+        }
+
+        if (!TryResolveChartsResolution(timeframe, out var resolution, out var sourceTimeframe))
+        {
+            return ChartsError($"Charts resolution not available for timeframe {timeframe}.");
+        }
+
+        var chartsSymbol = KrakenFuturesSymbolFormatter.Normalize(symbol);
+        var symbolsResult = await GetChartsSymbolsAsync(ct);
+        if (!symbolsResult.Ok || symbolsResult.Value is null)
+        {
+            return ChartsError(symbolsResult.Error?.Message ?? "Charts symbol list unavailable.");
+        }
+
+        if (!symbolsResult.Value.Any(value => string.Equals(value, chartsSymbol, StringComparison.OrdinalIgnoreCase)))
+        {
+            return ChartsError($"Charts symbol {chartsSymbol} not found for tick type {_chartsTickType}.");
+        }
+
+        var targetMinutes = TimeframeToMinutes(timeframe);
+        var sourceMinutes = TimeframeToMinutes(sourceTimeframe);
+        var aggregateFactor = Math.Max(1, targetMinutes / Math.Max(1, sourceMinutes));
+        var desiredBars = lookbackBars + 1;
+        var maxBars = Math.Max(1, _chartsMaxCandlesPerRequest * _chartsMaxBatches);
+        if (desiredBars > maxBars)
+        {
+            return ChartsError($"Charts max bars capped at {maxBars} for timeframe {timeframe}.");
+        }
+
+        var sourceBars = desiredBars * aggregateFactor;
+
+        var chartsCandlesResult = await FetchChartsCandlesAsync(chartsSymbol, resolution, sourceBars, ct);
+        if (!chartsCandlesResult.Ok || chartsCandlesResult.Value is null)
+        {
+            return chartsCandlesResult;
+        }
+
+        var candles = chartsCandlesResult.Value.ToList();
+        if (aggregateFactor > 1)
+        {
+            candles = AggregateCandles(candles, targetMinutes);
+        }
+
+        candles = candles
+            .OrderBy(c => c.OpenTimeUtc)
+            .ToList();
+
+        if (candles.Count > desiredBars)
+        {
+            candles = candles.Skip(candles.Count - desiredBars).ToList();
+        }
+
+        if (candles.Count < lookbackBars)
+        {
+            return ChartsError($"Charts returned {candles.Count} candles, required {lookbackBars}.");
+        }
+
+        return new Result<IReadOnlyList<Candle>>(true, candles, null);
+    }
+
+    private async Task<Result<IReadOnlyList<string>>> GetChartsSymbolsAsync(CancellationToken ct)
+    {
+        var cacheKey = $"kraken:charts:symbols:{_chartsTickType}";
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<string>? cached) && cached is not null)
+        {
+            return new Result<IReadOnlyList<string>>(true, cached, null);
+        }
+
+        var uri = BuildChartsUri($"{_chartsTickType}");
+        var response = await _httpClient.GetAsync(uri, ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            return ChartsError<IReadOnlyList<string>>($"Charts symbols request failed with {(int)response.StatusCode}.");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+        if (doc.RootElement.ValueKind != JsonValueKind.Array)
+        {
+            return ChartsError<IReadOnlyList<string>>("Charts symbols response was not an array.");
+        }
+
+        var symbols = doc.RootElement.EnumerateArray()
+            .Where(item => item.ValueKind == JsonValueKind.String)
+            .Select(item => item.GetString())
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!)
+            .ToList();
+
+        CacheSet(cacheKey, symbols, ChartsSymbolsTtlSeconds);
+        return new Result<IReadOnlyList<string>>(true, symbols, null);
+    }
+
+    private async Task<Result<IReadOnlyList<Candle>>> FetchChartsCandlesAsync(
+        string symbol,
+        string resolution,
+        int targetBars,
+        CancellationToken ct)
+    {
+        if (targetBars <= 0)
+        {
+            return ChartsError<IReadOnlyList<Candle>>("Charts candle target bars must be greater than zero.");
+        }
+
+        var cacheKey = $"kraken:charts:candles:{_chartsTickType}:{symbol}:{resolution}:{targetBars}";
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<Candle>? cached) && cached is not null)
+        {
+            return new Result<IReadOnlyList<Candle>>(true, cached, null);
+        }
+
+        var collected = new List<Candle>();
+        long? toSeconds = null;
+        var attempts = 0;
+
+        while (collected.Count < targetBars && attempts < _chartsMaxBatches)
+        {
+            var remaining = targetBars - collected.Count;
+            var requestCount = Math.Min(_chartsMaxCandlesPerRequest, Math.Max(1, remaining));
+            var uri = BuildChartsUri($"{_chartsTickType}/{symbol}/{resolution}", requestCount, toSeconds);
+            var response = await _httpClient.GetAsync(uri, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                return ChartsError<IReadOnlyList<Candle>>($"Charts candles request failed with {(int)response.StatusCode}.");
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+
+            if (!TryGetArray(doc.RootElement, "candles", out var candlesArray))
+            {
+                return ChartsError<IReadOnlyList<Candle>>("Charts response missing candles array.");
+            }
+
+            var batch = ParseCandles(candlesArray)
+                .OrderBy(c => c.OpenTimeUtc)
+                .ToList();
+            if (batch.Count == 0)
+            {
+                break;
+            }
+
+            collected.AddRange(batch);
+            var earliest = batch[0].OpenTimeUtc;
+            toSeconds = earliest.ToUnixTimeSeconds() - 1;
+
+            if (batch.Count < requestCount)
+            {
+                break;
+            }
+
+            attempts++;
+        }
+
+        var deduped = collected
+            .GroupBy(c => c.OpenTimeUtc)
+            .Select(g => g.Last())
+            .OrderBy(c => c.OpenTimeUtc)
+            .ToList();
+
+        if (deduped.Count > targetBars)
+        {
+            deduped = deduped.Skip(deduped.Count - targetBars).ToList();
+        }
+
+        CacheSet(cacheKey, deduped, _cacheOptions.CandlesTtlSeconds);
+        return new Result<IReadOnlyList<Candle>>(true, deduped, null);
+    }
+
+    private static bool TryResolveChartsResolution(Timeframe timeframe, out string resolution, out Timeframe sourceTimeframe)
+    {
+        sourceTimeframe = timeframe;
+        switch (timeframe)
+        {
+            case Timeframe.M1:
+                resolution = "1m";
+                return true;
+            case Timeframe.M5:
+                resolution = "5m";
+                return true;
+            case Timeframe.M15:
+                resolution = "15m";
+                return true;
+            case Timeframe.M30:
+                resolution = "30m";
+                return true;
+            case Timeframe.H1:
+                resolution = "1h";
+                return true;
+            case Timeframe.H2:
+                resolution = "1h";
+                sourceTimeframe = Timeframe.H1;
+                return true;
+            case Timeframe.H4:
+                resolution = "4h";
+                return true;
+            case Timeframe.H12:
+                resolution = "12h";
+                return true;
+            case Timeframe.D1:
+                resolution = "1d";
+                return true;
+            default:
+                resolution = string.Empty;
+                return false;
+        }
+    }
+
+    private string BuildChartsUri(string path, int? count = null, long? toSeconds = null)
+    {
+        var baseUrl = _chartsBaseUrl.TrimEnd('/');
+        var uri = $"{baseUrl}/{path}";
+        var hasQuery = false;
+
+        if (count is not null)
+        {
+            uri += $"?count={count.Value}";
+            hasQuery = true;
+        }
+
+        if (toSeconds is not null)
+        {
+            uri += $"{(hasQuery ? "&" : "?")}to={toSeconds.Value}";
+        }
+
+        return uri;
+    }
+
+    private static List<Candle> AggregateCandles(IReadOnlyList<Candle> candles, int intervalMinutes)
+    {
+        if (candles.Count == 0)
+        {
+            return new List<Candle>();
+        }
+
+        var intervalSeconds = Math.Max(1, intervalMinutes) * 60;
+        var buckets = new SortedDictionary<long, CandleBuilder>();
+
+        foreach (var candle in candles.OrderBy(c => c.OpenTimeUtc))
+        {
+            var bucketStartSeconds = (candle.OpenTimeUtc.ToUnixTimeSeconds() / intervalSeconds) * intervalSeconds;
+            if (!buckets.TryGetValue(bucketStartSeconds, out var builder))
+            {
+                builder = new CandleBuilder(DateTimeOffset.FromUnixTimeSeconds(bucketStartSeconds));
+                buckets[bucketStartSeconds] = builder;
+            }
+
+            builder.Update(candle);
+        }
+
+        return buckets.Values.Select(b => b.ToCandle()).ToList();
+    }
+
+    private static string ResolveChartsBaseUrl(KrakenFuturesOptions options)
+    {
+        if (!string.IsNullOrWhiteSpace(options.ChartsBaseUrl))
+        {
+            return options.ChartsBaseUrl;
+        }
+
+        var baseUrl = options.BaseUrl ?? string.Empty;
+        if (baseUrl.Contains("demo-futures.kraken.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return "https://demo-futures.kraken.com/api/charts/v1";
+        }
+
+        if (baseUrl.Contains("futures.kraken.com", StringComparison.OrdinalIgnoreCase))
+        {
+            return KrakenFuturesOptions.DefaultChartsBaseUrl;
+        }
+
+        return KrakenFuturesOptions.DefaultChartsBaseUrl;
+    }
+
+    private static Result<T> ChartsError<T>(string message)
+    {
+        return new Result<T>(
+            false,
+            default,
+            new Error("CHARTS_ERROR", message, null));
+    }
+
+    private static Result<IReadOnlyList<Candle>> ChartsError(string message)
+    {
+        return ChartsError<IReadOnlyList<Candle>>(message);
     }
 
     private void CacheSet<T>(string key, T value, int ttlSeconds)
@@ -406,6 +738,33 @@ public sealed class KrakenFuturesMarketDataProvider : IMarketDataProvider
 
             Close = price;
             Volume += size;
+        }
+
+        public void Update(Candle candle)
+        {
+            if (!_hasValue)
+            {
+                _hasValue = true;
+                Open = candle.Open;
+                High = candle.High;
+                Low = candle.Low;
+                Close = candle.Close;
+                Volume = candle.Volume;
+                return;
+            }
+
+            if (candle.High > High)
+            {
+                High = candle.High;
+            }
+
+            if (candle.Low < Low)
+            {
+                Low = candle.Low;
+            }
+
+            Close = candle.Close;
+            Volume += candle.Volume;
         }
 
         public Candle ToCandle()

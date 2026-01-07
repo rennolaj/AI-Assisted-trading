@@ -25,7 +25,9 @@ This note captures what happens after an alert is received, what data is collect
 ## Data Collected Per Alert
 Indicators (`IndicatorEngine`):
 - Requests OHLCV per configured timeframe.
-- Uses `Indicator:LookbackDays` (default = 1 day) when set.
+- Uses `Indicator:LookbackDaysByTimeframe` when set, otherwise falls back to `Indicator:LookbackDays` (default = 1 day).
+- Enforces indicator minimum bars (RSI/MACD/Stoch/volume), so short lookbacks are automatically expanded to the required minimum.
+- Kraken Futures v3 only returns trade history (~100 trades); use the Charts API for OHLC where available.
 - For scalping defaults:
   - M5: 288 bars
   - M15: 96 bars
@@ -44,6 +46,8 @@ Elliott (`ElliottEngine`):
 
 ## Tuning Knobs
 - `Indicator:LookbackDays`
+- `Indicator:LookbackDaysByTimeframe`
 - `Indicator:LookbackBars`
+- `Indicator:LookbackBarsByTimeframe`
 - `Elliott:LookbackDays`
 - `Elliott:BaseTimeframe`

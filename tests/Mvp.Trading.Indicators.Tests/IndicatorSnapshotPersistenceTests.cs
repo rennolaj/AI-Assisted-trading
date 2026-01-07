@@ -66,7 +66,7 @@ public sealed class IndicatorSnapshotPersistenceTests
         return new IndicatorSnapshot(
             alertId,
             Guid.NewGuid(),
-            "PI_XBTUSD",
+            "BTCUSD.P",
             IndicatorDefaults.ScalpingMode,
             "LONG",
             Timeframe.M30,

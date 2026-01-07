@@ -26,7 +26,7 @@ public sealed class IndicatorSnapshotDeterminismTests
         var input = new IndicatorInput(
             Guid.Parse("6B1E3F9A-8E32-4AA7-AB40-83206E6A7C6A"),
             Guid.Parse("9D48C3A0-746A-4D4A-9A1A-08E64B4B4C72"),
-            "PI_XBTUSD",
+            "BTCUSD.P",
             "LONG",
             evaluationTime);
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Mvp.Trading.Worker;
@@ -10,6 +11,11 @@ public sealed class ElliottRunOptions
     public string BaseTimeframe { get; set; } = "M15";
 
     public ElliottParametersOptions Parameters { get; set; } = new();
+
+    public Dictionary<string, ElliottParametersOptions> Profiles { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
+
+    public ElliottProfileSelectionOptions ProfileSelection { get; set; } = new();
 
     public int LookbackDays { get; set; } = 1;
 
@@ -30,4 +36,17 @@ public sealed class ElliottParametersOptions
     public decimal DeviationPct { get; set; } = 5m;
 
     public int MaxCandidates { get; set; } = 10;
+}
+
+/// <summary>
+/// Selection rules for choosing Elliott profiles.
+/// </summary>
+public sealed class ElliottProfileSelectionOptions
+{
+    public string DefaultProfile { get; set; } = "default";
+
+    public string FallbackProfile { get; set; } = "";
+
+    public Dictionary<string, string> RiskCategoryMap { get; set; }
+        = new(StringComparer.OrdinalIgnoreCase);
 }

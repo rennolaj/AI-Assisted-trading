@@ -64,7 +64,7 @@ public sealed class ElliottPipelineIntegrationTests
         var payload = JsonSerializer.Serialize(alert);
         await db.ListRightPushAsync(queueKey, payload);
 
-        var fixture = LoadFixture("fixtures/kraken-futures/pi_xbtusd_m1_varied.json");
+        var fixture = LoadFixture("fixtures/kraken-futures/btcusd_p_m1_varied.json");
         var marketData = new FixtureMarketDataProvider(fixture.Candles);
 
         var indicatorConfig = BuildIndicatorConfig(fixture.Candles.Count);
@@ -85,9 +85,17 @@ public sealed class ElliottPipelineIntegrationTests
             new CandidateScorer(elliottOptions),
             new InvalidationCalculator(elliottOptions));
 
-        var elliottConfig = new ElliottRunConfig(
-            Timeframe.M1,
-            new ElliottParameters("ZigZag", Depth: 1, DeviationPct: 0.05m, MaxCandidates: 10));
+        var baseParameters = new ElliottParameters("ZigZag", Depth: 1, DeviationPct: 0.05m, MaxCandidates: 10, ProfileName: "default");
+        var profileSelection = new ElliottProfileSelection(
+            "default",
+            null,
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, ElliottParameters>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["default"] = baseParameters
+            });
+
+        var elliottConfig = new ElliottRunConfig(Timeframe.M1, baseParameters, profileSelection);
 
         var workerOptions = Options.Create(new WorkerOptions
         {
@@ -97,13 +105,7 @@ public sealed class ElliottPipelineIntegrationTests
             TradeMonitorIntervalMs = 1000
         });
 
-        var symbolMapper = new SymbolMapper(new SymbolMappingOptions
-        {
-            KrakenFutures = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["BTCUSD.P"] = "PI_XBTUSD"
-            }
-        });
+        var symbolMapper = new SymbolMapper(new SymbolMappingOptions());
 
         var processingStore = new PostgresAlertProcessingStore(dataSource);
         var snapshotStore = new PostgresIndicatorSnapshotStore(dataSource);
@@ -201,6 +203,8 @@ public sealed class ElliottPipelineIntegrationTests
             TrendTimeframe: Timeframe.M1,
             LookbackBars: Math.Max(lookbackBars, 30),
             LookbackDays: 0,
+            LookbackBarsByTimeframe: new Dictionary<Timeframe, int>(),
+            LookbackDaysByTimeframe: new Dictionary<Timeframe, int>(),
             EvaluationWindowMinutes: 60,
             EvaluationIntervalMinutes: 1,
             SnapshotPrecision: 6,
@@ -227,7 +231,7 @@ public sealed class ElliottPipelineIntegrationTests
         using var doc = JsonDocument.Parse(stream);
         var root = doc.RootElement;
 
-        var symbol = root.GetProperty("symbol").GetString() ?? "PI_XBTUSD";
+        var symbol = root.GetProperty("symbol").GetString() ?? "BTCUSD.P";
         var interval = root.GetProperty("intervalMinutes").GetInt32();
         var candles = new List<Candle>();
 

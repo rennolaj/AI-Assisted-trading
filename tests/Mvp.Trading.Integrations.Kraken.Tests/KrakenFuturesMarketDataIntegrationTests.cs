@@ -16,6 +16,7 @@ public sealed class KrakenFuturesMarketDataIntegrationTests
     private const string EnabledEnv = "KRAKEN_FUTURES_INTEGRATION_TESTS";
     private const string RestBaseEnv = "KRAKEN_FUTURES_REST_BASE";
     private const string LegacyBaseUrlEnv = "KRAKEN_FUTURES_BASE_URL";
+    private const string ChartsBaseEnv = "KRAKEN_FUTURES_CHARTS_BASE";
     private const string SymbolEnv = "KRAKEN_FUTURES_TEST_SYMBOL";
 
     [Fact]
@@ -67,6 +68,7 @@ public sealed class KrakenFuturesMarketDataIntegrationTests
         var options = new KrakenFuturesOptions
         {
             BaseUrl = baseUrl,
+            ChartsBaseUrl = Environment.GetEnvironmentVariable(ChartsBaseEnv) ?? string.Empty,
             TimeoutSeconds = 10
         };
 

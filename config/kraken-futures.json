@@ -1,18 +1,24 @@
 {
   "KrakenFutures": {
     "Environment": "demo",
+    "ChartsTickType": "trade",
+    "ChartsMaxCandlesPerRequest": 500,
+    "ChartsMaxBatches": 10,
+    "ChartsFallbackToHistory": true,
     "Environments": {
       "demo": {
         "BaseUrl": "https://demo-futures.kraken.com/derivatives/api/v3",
         "AuthBaseUrl": "https://demo-futures.kraken.com/api/auth/v1",
         "WebSocketUrl": "wss://demo-futures.kraken.com/ws/v1",
-        "TestSymbol": "PI_XBTUSD"
+        "ChartsBaseUrl": "https://demo-futures.kraken.com/api/charts/v1",
+        "TestSymbol": "BTCUSD.P"
       },
       "prod": {
         "BaseUrl": "https://futures.kraken.com/derivatives/api/v3",
         "AuthBaseUrl": "https://futures.kraken.com/api/auth/v1",
         "WebSocketUrl": "wss://futures.kraken.com/ws/v1",
-        "TestSymbol": "PI_XBTUSD"
+        "ChartsBaseUrl": "https://futures.kraken.com/api/charts/v1",
+        "TestSymbol": "BTCUSD.P"
       }
     }
   }

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Text.Json;
 using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Contracts;
@@ -130,12 +131,41 @@ public sealed class AlertWorker : BackgroundService
 
                         await _snapshotStore.UpsertAsync(snapshotResult.Value, stoppingToken);
 
+                        var profileName = _elliottConfig.ProfileSelection.ResolveProfileName(snapshotResult.Value.Risk.Category);
+                        var parameters = ResolveElliottParameters(profileName);
+
+                        _logger.LogInformation(
+                            "Elliott profile {Profile} selected for risk {RiskCategory}.",
+                            profileName,
+                            snapshotResult.Value.Risk.Category);
+
                         var elliottCandidates = await _elliottEngine.GenerateCandidatesAsync(
                             symbol,
                             _elliottConfig.BaseTimeframe,
-                            _elliottConfig.Parameters,
+                            parameters,
                             input.EvaluationTimeUtc,
                             stoppingToken);
+
+                        if (ShouldFallback(elliottCandidates) &&
+                            _elliottConfig.ProfileSelection.TryGetFallback(profileName, out var fallbackName, out var fallbackParameters))
+                        {
+                            _logger.LogInformation("Elliott fallback profile {Profile} activated.", fallbackName);
+
+                            var fallbackCandidates = await _elliottEngine.GenerateCandidatesAsync(
+                                symbol,
+                                _elliottConfig.BaseTimeframe,
+                                fallbackParameters,
+                                input.EvaluationTimeUtc,
+                                stoppingToken);
+
+                            if (!ShouldFallback(fallbackCandidates) ||
+                                fallbackCandidates.Candidates.Count > elliottCandidates.Candidates.Count)
+                            {
+                                profileName = fallbackName;
+                                parameters = fallbackParameters;
+                                elliottCandidates = fallbackCandidates;
+                            }
+                        }
 
                         await _elliottStore.UpsertAsync(
                             alert.AlertId,
@@ -143,7 +173,7 @@ public sealed class AlertWorker : BackgroundService
                             input.EvaluationTimeUtc,
                             symbol,
                             _elliottConfig.BaseTimeframe,
-                            _elliottConfig.Parameters,
+                            parameters with { ProfileName = profileName },
                             elliottCandidates,
                             stoppingToken);
 
@@ -256,6 +286,28 @@ public sealed class AlertWorker : BackgroundService
     private static SignalSnapshot ToSignalSnapshot(IndicatorSnapshot snapshot)
     {
         return new SignalSnapshot(snapshot.Symbol, snapshot.ComputedAtUtc, snapshot.Timeframes);
+    }
+
+    private ElliottParameters ResolveElliottParameters(string profileName)
+    {
+        if (_elliottConfig.ProfileSelection.TryGetProfile(profileName, out var parameters))
+        {
+            return parameters;
+        }
+
+        return _elliottConfig.Parameters;
+    }
+
+    private static bool ShouldFallback(ElliottCandidates candidates)
+    {
+        if (candidates.Candidates.Count == 0)
+        {
+            return true;
+        }
+
+        return candidates.Candidates.All(candidate =>
+            candidate.RuleViolations.Any(violation =>
+                string.Equals(violation.Rule, ElliottRuleCodes.PivotsInsufficient, StringComparison.Ordinal)));
     }
 
     private async Task<Result<LlmDecision>> GetAdjudicationAsync(
