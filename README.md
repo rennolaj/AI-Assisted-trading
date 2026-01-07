@@ -107,6 +107,63 @@ curl -X POST http://localhost:8080/trades/open \
   -d '{"exchangeId":"kraken-futures","symbol":"BTCUSD.P","side":"LONG","entryPrice":70000,"invalidationPrice":68000}'
 ```
 
+## Kill Switch (Emergency Controls)
+The system includes a three-level kill switch for emergency halting of trading operations:
+
+**Kill Switch Levels:**
+- `PAUSE_NEW`: Stops only new alert processing (prevents new trades)
+- `PAUSE_ALL`: Pauses all background workers (alerts, reconciliation, monitoring)
+- `EMERGENCY_STOP`: Cancels all open orders and pauses all operations
+
+**API Endpoints:**
+```bash
+# Check kill switch status (no authentication required)
+curl http://localhost:8080/api/killswitch/status
+
+# Activate kill switch
+curl -X POST http://localhost:8080/api/killswitch/activate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "secret": "your-secret-here",
+    "level": "EMERGENCY_STOP",
+    "reason": "Market conditions require immediate halt",
+    "activatedBy": "operator-name"
+  }'
+
+# Deactivate kill switch
+curl -X POST http://localhost:8080/api/killswitch/deactivate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "secret": "your-secret-here",
+    "deactivatedBy": "operator-name",
+    "reason": "Issue resolved"
+  }'
+```
+
+**Configuration:**
+Set `KILL_SWITCH_SECRET` environment variable (or `KillSwitchApi:Secret` in config):
+```bash
+export KILL_SWITCH_SECRET="your-secure-secret-here"
+```
+
+**Worker Behavior:**
+- Workers check kill switch before each processing iteration
+- When paused, workers log status and continue health checks
+- EMERGENCY_STOP cancels all open orders before pausing
+- State persists in PostgreSQL `system_state` table
+- All actions are audited in `kill_switch_audit` table
+
+**Monitoring:**
+```sql
+-- Check current status
+SELECT * FROM system_state WHERE key = 'kill_switch';
+
+-- View audit history
+SELECT * FROM kill_switch_audit ORDER BY ts DESC LIMIT 20;
+```
+
+See `docs/m7.2-kill-switch-operations.md` for emergency procedures.
+
 ## Reconciliation System
 The system continuously monitors order state consistency between internal tracking and exchange state:
 
@@ -181,6 +238,7 @@ The output defaults to `tests/fixtures/kraken-futures/<symbol>_m<interval>.json`
 - `LocalLlm:ModelOverride`
 - `Worker:PollIntervalMs`
 - `Reconciliation:IntervalSeconds` (default: 60)
+- `KillSwitchApi:Secret` (required for activate/deactivate endpoints)
 - `KrakenFutures:Environment`
 - `KrakenFutures:BaseUrl`
 - `KrakenFutures:AuthBaseUrl`
