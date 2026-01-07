@@ -272,20 +272,46 @@ dotnet not found. Install .NET 10 or set DOTNET_ROOT environment variable.
 
 ### Build Fails in Docker
 
-**Issue:** Docker build fails with "script not found" error.
+**Issue:** Docker build fails with "script not found" or `bash\r: No such file or directory` error.
+
+**Root Cause:** Windows line endings (CRLF) in shell scripts instead of Unix line endings (LF).
 
 **Solutions:**
-1. Ensure line endings are LF (not CRLF):
+
+1. **Automatic Fix (Recommended):** The Dockerfiles now automatically convert line endings:
+   ```dockerfile
+   # This happens automatically during Docker build
+   RUN find scripts -name "*.sh" -type f -exec sed -i 's/\r$//' {} \;
+   ```
+
+2. **Fix Git configuration** (prevents future issues):
    ```powershell
+   # Configure Git to checkout with LF line endings
    git config core.autocrlf false
+   
+   # Re-checkout all files with correct line endings
    git rm --cached -r .
    git reset --hard
    ```
 
-2. Rebuild with no cache:
+3. **Manual verification:**
+   ```powershell
+   # Check if files have CRLF (bad)
+   git ls-files --eol | Select-String "crlf"
+   
+   # Should show: i/lf for .sh files (input uses LF)
+   git ls-files --eol | Select-String ".sh"
+   ```
+
+4. **Rebuild with no cache:**
    ```powershell
    docker compose build --no-cache
    ```
+
+**Note:** The repository includes `.gitattributes` that enforces:
+- Shell scripts (`.sh`): Always use LF (Unix)
+- PowerShell scripts (`.ps1`): Use CRLF (Windows)
+- Dockerfiles: Always use LF
 
 ### Permission Denied on Scripts
 
