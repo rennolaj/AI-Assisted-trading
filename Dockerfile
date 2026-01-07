@@ -7,10 +7,13 @@ ENV DOTNET_CLI_TELEMETRY_OPTOUT=1
 
 COPY . .
 
-RUN ./scripts/restore.sh
-RUN ./scripts/build.sh
-RUN ./scripts/test.sh
-RUN ./scripts/dotnet.sh publish src/Mvp.Trading.Api/Mvp.Trading.Api.csproj -c Release -o /app/publish
+# Support both bash and PowerShell scripts (use bash in Linux containers)
+RUN chmod +x scripts/*.sh 2>/dev/null || true
+RUN ./scripts/restore.sh || pwsh -File ./scripts/restore.ps1
+RUN ./scripts/build.sh || pwsh -File ./scripts/build.ps1
+RUN ./scripts/test.sh || pwsh -File ./scripts/test.ps1
+RUN ./scripts/dotnet.sh publish src/Mvp.Trading.Api/Mvp.Trading.Api.csproj -c Release -o /app/publish || \
+    pwsh -File ./scripts/dotnet.ps1 publish src/Mvp.Trading.Api/Mvp.Trading.Api.csproj -c Release -o /app/publish
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app

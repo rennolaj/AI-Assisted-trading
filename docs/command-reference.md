@@ -2,6 +2,8 @@
 
 Quick reference for all common development, testing, deployment, and monitoring operations.
 
+> **Windows Users:** PowerShell versions of all scripts are available. See [scripts/WINDOWS.md](../scripts/WINDOWS.md) for detailed Windows instructions.
+
 ---
 
 ## Table of Contents
@@ -13,12 +15,15 @@ Quick reference for all common development, testing, deployment, and monitoring 
 6. [Monitoring & Observability](#monitoring--observability)
 7. [Database Operations](#database-operations)
 8. [Troubleshooting](#troubleshooting)
+9. [Windows Support](#windows-support)
 
 ---
 
 ## Development Workflow
 
 ### Initial Setup
+
+**Linux/macOS:**
 ```bash
 # Install .NET SDK 10.x
 brew install --cask dotnet-sdk
@@ -33,7 +38,24 @@ brew install --cask dotnet-sdk
 ./scripts/test.sh
 ```
 
+**Windows (PowerShell):**
+```powershell
+# Install .NET SDK 10.x from https://dotnet.microsoft.com/download/dotnet/10.0
+# Or via Chocolatey: choco install dotnet-sdk
+
+# Restore dependencies
+.\scripts\restore.ps1
+
+# Build all projects
+.\scripts\build.ps1
+
+# Run all tests
+.\scripts\test.ps1
+```
+
 ### Build Commands
+
+**Linux/macOS:**
 ```bash
 # Full rebuild
 ./scripts/build.sh
@@ -43,6 +65,21 @@ dotnet build src/Mvp.Trading.Api/Mvp.Trading.Api.csproj
 
 # Clean build
 dotnet clean && ./scripts/build.sh
+
+# Build with specific configuration
+dotnet build --configuration Release
+```
+
+**Windows (PowerShell):**
+```powershell
+# Full rebuild
+.\scripts\build.ps1
+
+# Build specific project
+dotnet build src\Mvp.Trading.Api\Mvp.Trading.Api.csproj
+
+# Clean build
+dotnet clean; .\scripts\build.ps1
 
 # Build with specific configuration
 dotnet build --configuration Release
@@ -654,6 +691,71 @@ pkill -f "Mvp.Trading"
 
 ---
 
+## Windows Support
+
+All development and build scripts are available in PowerShell versions for Windows environments.
+
+### Available Windows Scripts
+
+| Bash Script | PowerShell Equivalent | Purpose |
+|-------------|----------------------|---------|
+| `./scripts/dotnet.sh` | `.\scripts\dotnet.ps1` | .NET CLI wrapper |
+| `./scripts/restore.sh` | `.\scripts\restore.ps1` | Restore NuGet packages |
+| `./scripts/build.sh` | `.\scripts\build.ps1` | Build solution |
+| `./scripts/test.sh` | `.\scripts\test.ps1` | Run all tests |
+| `./scripts/dev/bootstrap.sh` | `.\scripts\dev\bootstrap.ps1` | Setup dev environment |
+
+### Windows Setup Quick Start
+
+```powershell
+# 1. Install prerequisites
+choco install dotnet-sdk postgresql redis-64
+
+# 2. Bootstrap environment
+.\scripts\dev\bootstrap.ps1
+
+# 3. Build and test
+.\scripts\restore.ps1
+.\scripts\build.ps1
+.\scripts\test.ps1
+
+# 4. Run with Docker
+docker compose up --build -d
+```
+
+### Docker on Windows
+
+Docker Desktop supports both Linux and Windows containers:
+
+```powershell
+# Build with Docker (uses Linux containers by default)
+docker compose build
+
+# Run services
+docker compose up -d
+
+# View logs
+docker compose logs -f api worker
+```
+
+**Note:** The Dockerfiles automatically detect the platform and use the appropriate scripts (bash for Linux, PowerShell for Windows).
+
+### Detailed Windows Instructions
+
+For comprehensive Windows-specific documentation, troubleshooting, and best practices, see:
+
+📖 **[scripts/WINDOWS.md](../scripts/WINDOWS.md)**
+
+This includes:
+- Complete prerequisites and installation steps
+- PowerShell script usage and examples
+- Windows-specific configuration
+- Common issues and solutions
+- Path separator differences
+- Environment variable syntax
+
+---
+
 ## Best Practices
 
 1. **Always rebuild after config changes**: `docker compose up --build -d`
@@ -664,12 +766,15 @@ pkill -f "Mvp.Trading"
 6. **Use `.env.smoke` for smoke tests**: Never commit credentials
 7. **Verify environment**: Check `config/execution.json` before trading
 8. **Clean up resources**: `docker compose down -v` when done testing
+9. **Windows users**: Use PowerShell versions of scripts (see [scripts/WINDOWS.md](../scripts/WINDOWS.md))
+10. **Cross-platform**: Docker works the same on Linux, macOS, and Windows
 
 ---
 
 ## Emergency Contacts & Resources
 
 - **Documentation**: `/docs` directory
+- **Windows Guide**: [scripts/WINDOWS.md](../scripts/WINDOWS.md)
 - **Kraken API Docs**: https://docs.futures.kraken.com/
 - **Prometheus Docs**: https://prometheus.io/docs/
 - **Grafana Docs**: https://grafana.com/docs/
