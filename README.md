@@ -164,6 +164,56 @@ SELECT * FROM kill_switch_audit ORDER BY ts DESC LIMIT 20;
 
 See `docs/m7.2-kill-switch-operations.md` for emergency procedures.
 
+## Observability & Metrics
+
+The system exposes OpenTelemetry metrics for monitoring and observability.
+
+**Metrics Endpoints:**
+```bash
+# API metrics (Prometheus format)
+curl http://localhost:8080/metrics
+
+# Worker metrics (Prometheus format)
+curl http://localhost:9464/metrics
+```
+
+**Health Check Endpoints:**
+```bash
+# Basic health check
+curl http://localhost:8080/health
+
+# Dependency health (Postgres, Redis)
+curl http://localhost:8080/health/dependencies
+
+# Kubernetes readiness probe
+curl http://localhost:8080/health/ready
+
+# Kubernetes liveness probe
+curl http://localhost:8080/health/live
+```
+
+**Prometheus & Grafana:**
+When running with docker-compose, Prometheus and Grafana are automatically configured:
+- **Prometheus UI**: http://localhost:9090
+  - Pre-configured to scrape API (port 8080) and Worker (port 9464)
+  - 15-second scrape interval
+- **Grafana UI**: http://localhost:3000
+  - Default credentials: `admin` / `admin`
+  - Prometheus datasource pre-configured
+  - Create custom dashboards to visualize metrics
+
+**Key Metrics:**
+- `alerts_received_total` - Counter of alerts received (by exchange, symbol)
+- `alerts_processed_total` - Counter of alerts processed (by outcome)
+- `alert_processing_duration_seconds` - Histogram of processing duration
+- `queue_depth` - Gauge of current Redis queue depth
+- `orders_placed_total` - Counter of orders placed (by direction, type)
+- `orders_filled_total` - Counter of filled orders
+- `active_trades` - Gauge of currently open positions
+- `errors_total` - Counter of errors (by component, type)
+
+See `docs/m7.3-metrics-guide.md` for complete metrics catalog and Prometheus query examples.
+
 ## Reconciliation System
 The system continuously monitors order state consistency between internal tracking and exchange state:
 

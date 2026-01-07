@@ -78,6 +78,8 @@ services:
       Indicator__LookbackDaysByTimeframe__H2: "${INDICATOR_LOOKBACK_DAYS_H2:-3}"
       Redis__ConnectionString: "${REDIS_CONNECTION_STRING:-redis:6379}"
       Redis__AlertQueueKey: "${REDIS_ALERT_QUEUE_KEY:-mvp:alerts}"
+    ports:
+      - "9464:9464"
     depends_on:
       - redis
       - postgres
@@ -97,3 +99,34 @@ services:
     image: redis:7
     ports:
       - "6379:6379"
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - api
+      - worker
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
