@@ -51,7 +51,7 @@ public sealed class ExecutionService : IExecutionService
         if (heartbeat.IsStale)
         {
             _metrics.RecordExecutionOutcome("rejected_heartbeat");
-            _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
+            _metrics.RecordExecutionDuration(stopwatch.Elapsed, "total");
             return Fail("EXECUTION_HEARTBEAT_STALE", "Execution heartbeat is stale; refusing to execute.");
         }
 
@@ -94,21 +94,21 @@ public sealed class ExecutionService : IExecutionService
 
             _metrics.RecordExecutionOutcome("filled");
             _metrics.RecordOrderPlaced(request.Plan.Side, "MARKET");
-            _metrics.RecordOrderFilled(request.Plan.Symbol, request.Plan.Side);
-            _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
+            _metrics.RecordOrderFilled(request.Plan.Symbol, request.Plan.Side, request.Plan.Quantity, request.Plan.EntryLimitPrice);
+            _metrics.RecordExecutionDuration(stopwatch.Elapsed, "total");
             return new Result<ExecutionReceipt>(true, receipt, null);
         }
 
         if (IsKrakenMode(mode))
         {
             var result = await ExecuteKrakenAsync(request, executionId, createdAt, mode, settings, stopwatch, ct);
-            _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
+            _metrics.RecordExecutionDuration(stopwatch.Elapsed, "total");
             return result;
         }
 
         await _intentStore.SaveAsync(executionId, request.Plan.PlanId, mode, "NOT_IMPLEMENTED", createdAt, ct);
         _metrics.RecordExecutionOutcome("error");
-        _metrics.RecordExecutionDuration(stopwatch.Elapsed.TotalSeconds, "total");
+        _metrics.RecordExecutionDuration(stopwatch.Elapsed, "total");
         return Fail("EXECUTION_MODE_UNSUPPORTED", $"Execution mode '{mode}' is not implemented yet.");
     }
 
@@ -206,7 +206,7 @@ public sealed class ExecutionService : IExecutionService
         
         if (entryResult.Value.Status == "FILLED")
         {
-            _metrics.RecordOrderFilled(request.Plan.Symbol, request.Plan.Side);
+            _metrics.RecordOrderFilled(request.Plan.Symbol, request.Plan.Side, request.Plan.Quantity, request.Plan.EntryLimitPrice);
         }
 
         var stopClientOrderId = $"{executionId}-STOP";
