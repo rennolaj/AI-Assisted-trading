@@ -63,13 +63,14 @@ public sealed class KrakenFuturesTradingIntegrationTests : IDisposable
         var provider = CreateProvider();
         var symbol = GetTestSymbol();
         
-        // Place a limit order far from market price (so it won't fill immediately)
+        // Place a limit order far below current market (~$100k for BTC)
+        // Using $10,000 ensures order won't fill and preserves demo account balance
         var request = new SendOrderRequest(
             Symbol: symbol,
             Side: "buy",
             Size: 1m, // Minimum size for most futures contracts
             OrderType: "lmt",
-            LimitPrice: 1.0m, // Far below market to avoid execution
+            LimitPrice: 10000m, // Far below market to avoid execution
             StopPrice: null,
             ProcessBeforeUtc: null,
             ClientOrderId: $"test-{Guid.NewGuid():N}"
@@ -118,13 +119,13 @@ public sealed class KrakenFuturesTradingIntegrationTests : IDisposable
         var provider = CreateProvider();
         var symbol = GetTestSymbol();
         
-        // First, place an order
+        // First, place an order (far below market to avoid fill)
         var sendRequest = new SendOrderRequest(
             Symbol: symbol,
             Side: "buy",
             Size: 1m,
             OrderType: "lmt",
-            LimitPrice: 1.0m,
+            LimitPrice: 10000m, // Realistic but safely below market
             StopPrice: null,
             ProcessBeforeUtc: null,
             ClientOrderId: $"test-cancel-{Guid.NewGuid():N}"
