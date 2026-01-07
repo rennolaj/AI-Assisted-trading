@@ -4,10 +4,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Npgsql;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using StackExchange.Redis;
 using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Integrations.Kraken;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Contracts.Telemetry;
 using Mvp.Trading.Elliott;
 using Mvp.Trading.Execution;
 using Mvp.Trading.Indicators;
@@ -221,6 +224,18 @@ public static class Program
             var logger = sp.GetRequiredService<ILogger<KillSwitchService>>();
             return new KillSwitchService(connectionString, cache, tradingProvider, logger);
         });
+
+        // OpenTelemetry metrics
+        builder.Services.AddOpenTelemetry()
+            .ConfigureResource(resource => resource.AddService("mvp-trading-worker"))
+            .WithMetrics(metrics =>
+            {
+                metrics.AddMeter("Mvp.Trading");
+                metrics.AddPrometheusHttpListener(options => options.UriPrefixes = new[] { "http://localhost:9464/" });
+            });
+
+        // Metrics service
+        builder.Services.AddSingleton<IMetricsService, OpenTelemetryMetricsService>();
 
         builder.Services.AddHostedService<AlertWorker>();
         builder.Services.AddHostedService<TradeMonitorWorker>();

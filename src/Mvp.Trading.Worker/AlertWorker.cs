@@ -1,8 +1,10 @@
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Contracts.Telemetry;
 using Mvp.Trading.Elliott;
 using Mvp.Trading.Execution;
 using Mvp.Trading.Indicators;
@@ -37,6 +39,7 @@ public sealed class AlertWorker : BackgroundService
     private readonly IExecutionService _executionService;
     private readonly McpProviderOptions _mcpOptions;
     private readonly IKillSwitchService _killSwitchService;
+    private readonly IMetricsService _metricsService;
 
     public AlertWorker(
         IConnectionMultiplexer redis,
@@ -54,6 +57,7 @@ public sealed class AlertWorker : BackgroundService
         IExecutionService executionService,
         IOptions<McpProviderOptions> mcpOptions,
         IKillSwitchService killSwitchService,
+        IMetricsService metricsService,
         SymbolMapper symbolMapper,
         ILogger<AlertWorker> logger)
     {
@@ -72,6 +76,7 @@ public sealed class AlertWorker : BackgroundService
         _executionService = executionService;
         _mcpOptions = mcpOptions.Value;
         _killSwitchService = killSwitchService;
+        _metricsService = metricsService;
         _symbolMapper = symbolMapper;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
@@ -115,6 +120,12 @@ public sealed class AlertWorker : BackgroundService
                         _logger.LogWarning("Dequeued payload was null after deserialization.");
                         continue;
                     }
+
+                    // Record alert received
+                    _metricsService.RecordAlertReceived(alert.Tv.Exchange, alert.Tv.Ticker);
+
+                    // Start timing alert processing
+                    var stopwatch = Stopwatch.StartNew();
 
                     await _processingStore.UpsertAsync(alert, "processing", null, stoppingToken);
 
@@ -204,6 +215,10 @@ public sealed class AlertWorker : BackgroundService
                             var errorMessage = adjudication.Error?.Message ?? "MCP adjudication failed.";
                             await _processingStore.UpsertAsync(alert, "adjudication_failed", $"{errorCode}: {errorMessage}", stoppingToken);
                             _logger.LogWarning("MCP adjudication failed for alert {AlertId}: {ErrorCode}", alert.AlertId, errorCode);
+                            
+                            stopwatch.Stop();
+                            _metricsService.RecordAlertProcessed("error");
+                            _metricsService.RecordAlertProcessingDuration(stopwatch.Elapsed);
                             continue;
                         }
 
@@ -218,6 +233,10 @@ public sealed class AlertWorker : BackgroundService
                                 "Alert {AlertId} rejected by MCP with decision {Decision}.",
                                 alert.AlertId,
                                 adjudication.Value.Decision);
+                            
+                            stopwatch.Stop();
+                            _metricsService.RecordAlertProcessed("rejected_llm");
+                            _metricsService.RecordAlertProcessingDuration(stopwatch.Elapsed);
                             continue;
                         }
 
@@ -249,15 +268,28 @@ public sealed class AlertWorker : BackgroundService
                             var execError = execution.Error?.Message ?? "Execution failed.";
                             await _processingStore.UpsertAsync(alert, "execution_failed", execError, stoppingToken);
                             _logger.LogWarning("Execution failed for alert {AlertId}: {Error}", alert.AlertId, execError);
+                            
+                            stopwatch.Stop();
+                            _metricsService.RecordAlertProcessed("error");
+                            _metricsService.RecordAlertProcessingDuration(stopwatch.Elapsed);
                             continue;
                         }
 
                         await _processingStore.UpsertAsync(alert, "executed", null, stoppingToken);
+                        
+                        stopwatch.Stop();
+                        _metricsService.RecordAlertProcessed("accepted");
+                        _metricsService.RecordAlertProcessingDuration(stopwatch.Elapsed);
                     }
                     catch (Exception ex)
                     {
                         await _processingStore.UpsertAsync(alert, "failed", ex.Message, stoppingToken);
                         _logger.LogError(ex, "Processing failed for alert {AlertId}.", alert.AlertId);
+                        
+                        stopwatch.Stop();
+                        _metricsService.RecordAlertProcessed("error");
+                        _metricsService.RecordError("AlertWorker", ex.GetType().Name);
+                        _metricsService.RecordAlertProcessingDuration(stopwatch.Elapsed);
                     }
                 }
                 catch (JsonException ex)

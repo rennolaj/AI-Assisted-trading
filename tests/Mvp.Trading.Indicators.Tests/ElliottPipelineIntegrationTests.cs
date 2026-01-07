@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Api.Services;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Contracts.Telemetry;
 using Mvp.Trading.Elliott;
 using Mvp.Trading.Execution;
 using Mvp.Trading.Indicators;
@@ -119,6 +120,7 @@ public sealed class ElliottPipelineIntegrationTests
         var executionService = new StubExecutionService();
         var mcpOptions = Options.Create(new McpProviderOptions());
         var killSwitchService = new StubKillSwitchService();
+        var metricsService = new StubMetricsService();
 
         var worker = new AlertWorker(
             redisConnection,
@@ -136,6 +138,7 @@ public sealed class ElliottPipelineIntegrationTests
             executionService,
             mcpOptions,
             killSwitchService,
+            metricsService,
             symbolMapper,
             logger);
 
@@ -509,5 +512,24 @@ delete from idempotency_keys where idempotency_key = @key;";
         {
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class StubMetricsService : IMetricsService
+    {
+        public void RecordAlertReceived(string exchange, string symbol) { }
+        public void RecordAlertProcessed(string outcome) { }
+        public void RecordAlertProcessingDuration(TimeSpan duration) { }
+        public void RecordExecutionOutcome(string outcome) { }
+        public void RecordExecutionDuration(TimeSpan duration, string stage) { }
+        public void RecordOrderPlaced(string direction, string orderType) { }
+        public void RecordOrderCancelled(string reason) { }
+        public void RecordOrderFilled(string symbol, string direction, decimal quantity, decimal price) { }
+        public void RecordStopLossTriggered(string symbol) { }
+        public void RecordTakeProfitHit(string symbol, int targetNumber) { }
+        public void RecordError(string component, string errorType) { }
+        public void RecordApiError(string provider, string endpoint, string errorCode) { }
+        public void SetActiveTradesGauge(int count) { }
+        public void SetQueueDepthGauge(int count) { }
+        public void SetReconciliationDiscrepanciesGauge(int count) { }
     }
 }
