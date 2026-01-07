@@ -1,0 +1,40 @@
+# Git attributes for MVP Trading project
+# Ensures consistent line endings across platforms
+
+# Default behavior: let Git normalize line endings
+* text=auto
+
+# Shell scripts must always use LF (Unix-style line endings)
+*.sh text eol=lf
+
+# PowerShell scripts can use any line ending (Windows CRLF is fine)
+*.ps1 text eol=crlf
+
+# SQL scripts should use LF for consistency
+*.sql text eol=lf
+
+# Dockerfile always uses LF
+Dockerfile* text eol=lf
+
+# Configuration files use LF
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.xml text eol=lf
+*.props text eol=lf
+
+# C# source files can use any line ending (Git will normalize)
+*.cs text
+*.csproj text
+*.sln text
+
+# Binary files - don't touch
+*.dll binary
+*.exe binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary

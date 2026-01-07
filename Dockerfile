@@ -10,6 +10,8 @@ COPY . .
 # Support both bash and PowerShell scripts
 # Linux: use bash scripts
 # Windows: detect PowerShell (pwsh or powershell) and use appropriate path
+# Fix line endings for bash scripts (convert CRLF to LF on Windows-built images)
+RUN find scripts -name "*.sh" -type f -exec sed -i 's/\r$//' {} \; 2>/dev/null || true
 RUN chmod +x scripts/*.sh 2>/dev/null || true
 RUN ./scripts/restore.sh || \
     (pwsh -File ./scripts/restore.ps1 2>/dev/null || powershell -File ./scripts/restore.ps1)
