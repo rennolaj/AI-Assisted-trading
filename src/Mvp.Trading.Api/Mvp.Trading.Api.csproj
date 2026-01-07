@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Mvp.Trading.Contracts\Mvp.Trading.Contracts.csproj" />
+    <ProjectReference Include="..\Mvp.Trading.Execution\Mvp.Trading.Execution.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Execution;
 
 namespace Mvp.Trading.Worker;
 
@@ -17,17 +18,20 @@ public sealed class TradeMonitorWorker : BackgroundService
 {
     private readonly IMarketDataProvider _marketData;
     private readonly IOpenTradeRepository _repository;
+    private readonly IKillSwitchService _killSwitchService;
     private readonly WorkerOptions _options;
     private readonly ILogger<TradeMonitorWorker> _logger;
 
     public TradeMonitorWorker(
         IMarketDataProvider marketData,
         IOpenTradeRepository repository,
+        IKillSwitchService killSwitchService,
         IOptions<WorkerOptions> options,
         ILogger<TradeMonitorWorker> logger)
     {
         _marketData = marketData;
         _repository = repository;
+        _killSwitchService = killSwitchService;
         _options = options.Value;
         _logger = logger;
     }
@@ -40,7 +44,18 @@ public sealed class TradeMonitorWorker : BackgroundService
         {
             try
             {
-                await MonitorOnceAsync(stoppingToken);
+                // Check kill switch status - pause on PAUSE_ALL and EMERGENCY_STOP
+                var killSwitchStatus = await _killSwitchService.GetStatusAsync(stoppingToken);
+                if (killSwitchStatus.Active && 
+                    (killSwitchStatus.Level == KillSwitchLevel.PAUSE_ALL ||
+                     killSwitchStatus.Level == KillSwitchLevel.EMERGENCY_STOP))
+                {
+                    _logger.LogWarning("TradeMonitorWorker paused: Kill switch active at level {Level}", killSwitchStatus.Level);
+                }
+                else
+                {
+                    await MonitorOnceAsync(stoppingToken);
+                }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

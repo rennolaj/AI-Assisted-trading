@@ -11,15 +11,18 @@ namespace Mvp.Trading.Worker;
 public sealed class ReconciliationWorker : BackgroundService
 {
     private readonly IReconciliationService _reconciliationService;
+    private readonly IKillSwitchService _killSwitchService;
     private readonly ReconciliationOptions _options;
     private readonly ILogger<ReconciliationWorker> _logger;
 
     public ReconciliationWorker(
         IReconciliationService reconciliationService,
+        IKillSwitchService killSwitchService,
         IOptions<ReconciliationOptions> options,
         ILogger<ReconciliationWorker> logger)
     {
         _reconciliationService = reconciliationService;
+        _killSwitchService = killSwitchService;
         _options = options.Value;
         _logger = logger;
     }
@@ -35,6 +38,17 @@ public sealed class ReconciliationWorker : BackgroundService
         {
             try
             {
+                // Check kill switch status - pause on PAUSE_ALL and EMERGENCY_STOP
+                var killSwitchStatus = await _killSwitchService.GetStatusAsync(stoppingToken);
+                if (killSwitchStatus.Active && 
+                    (killSwitchStatus.Level == KillSwitchLevel.PAUSE_ALL ||
+                     killSwitchStatus.Level == KillSwitchLevel.EMERGENCY_STOP))
+                {
+                    _logger.LogWarning("ReconciliationWorker paused: Kill switch active at level {Level}", killSwitchStatus.Level);
+                    await Task.Delay(TimeSpan.FromSeconds(_options.PollingIntervalSeconds), stoppingToken);
+                    continue;
+                }
+
                 var result = await _reconciliationService.ReconcileAsync(stoppingToken);
                 
                 if (!result.Ok)

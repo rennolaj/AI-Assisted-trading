@@ -36,6 +36,7 @@ public sealed class AlertWorker : BackgroundService
     private readonly ITradePlanBuilder _tradePlanBuilder;
     private readonly IExecutionService _executionService;
     private readonly McpProviderOptions _mcpOptions;
+    private readonly IKillSwitchService _killSwitchService;
 
     public AlertWorker(
         IConnectionMultiplexer redis,
@@ -52,6 +53,7 @@ public sealed class AlertWorker : BackgroundService
         ITradePlanBuilder tradePlanBuilder,
         IExecutionService executionService,
         IOptions<McpProviderOptions> mcpOptions,
+        IKillSwitchService killSwitchService,
         SymbolMapper symbolMapper,
         ILogger<AlertWorker> logger)
     {
@@ -69,6 +71,7 @@ public sealed class AlertWorker : BackgroundService
         _tradePlanBuilder = tradePlanBuilder;
         _executionService = executionService;
         _mcpOptions = mcpOptions.Value;
+        _killSwitchService = killSwitchService;
         _symbolMapper = symbolMapper;
         _logger = logger;
         _jsonOptions = new JsonSerializerOptions
@@ -85,6 +88,18 @@ public sealed class AlertWorker : BackgroundService
         {
             try
             {
+                // Check kill switch status
+                var killSwitchStatus = await _killSwitchService.GetStatusAsync(stoppingToken);
+                if (killSwitchStatus.Active && 
+                    (killSwitchStatus.Level == KillSwitchLevel.PAUSE_NEW || 
+                     killSwitchStatus.Level == KillSwitchLevel.PAUSE_ALL ||
+                     killSwitchStatus.Level == KillSwitchLevel.EMERGENCY_STOP))
+                {
+                    _logger.LogWarning("AlertWorker paused: Kill switch active at level {Level}", killSwitchStatus.Level);
+                    await Task.Delay(_options.PollIntervalMs, stoppingToken);
+                    continue;
+                }
+
                 var payload = await DequeueAsync(stoppingToken);
                 if (payload.IsNullOrEmpty)
                 {

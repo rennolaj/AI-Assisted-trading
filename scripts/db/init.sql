@@ -153,3 +153,28 @@ create table if not exists execution_heartbeat (
     last_beat_utc timestamptz not null,
     stale_threshold_seconds int not null
 );
+
+-- System state table for kill switch and other global flags
+create table if not exists system_state (
+    key text primary key,
+    value jsonb not null,
+    updated_at_utc timestamptz not null default now(),
+    updated_by text
+);
+
+-- Kill switch audit trail
+create table if not exists kill_switch_audit (
+    audit_id uuid primary key default gen_random_uuid(),
+    action text not null, -- ACTIVATED, DEACTIVATED
+    level text not null,  -- PAUSE_NEW, PAUSE_ALL, EMERGENCY_STOP
+    reason text not null,
+    activated_by text,
+    timestamp_utc timestamptz not null default now()
+);
+
+create index if not exists idx_kill_switch_audit_timestamp on kill_switch_audit(timestamp_utc desc);
+
+-- Initialize kill switch as inactive
+insert into system_state (key, value, updated_by)
+values ('kill_switch', '{"active": false, "level": "PAUSE_ALL", "reason": null, "activated_at": null}'::jsonb, 'system')
+on conflict (key) do nothing;

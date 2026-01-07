@@ -118,6 +118,7 @@ public sealed class ElliottPipelineIntegrationTests
         var tradePlanBuilder = new StubTradePlanBuilder();
         var executionService = new StubExecutionService();
         var mcpOptions = Options.Create(new McpProviderOptions());
+        var killSwitchService = new StubKillSwitchService();
 
         var worker = new AlertWorker(
             redisConnection,
@@ -134,6 +135,7 @@ public sealed class ElliottPipelineIntegrationTests
             tradePlanBuilder,
             executionService,
             mcpOptions,
+            killSwitchService,
             symbolMapper,
             logger);
 
@@ -483,6 +485,29 @@ delete from idempotency_keys where idempotency_key = @key;";
                 null,
                 "stub");
             return Task.FromResult(new Result<ExecutionReceipt>(true, receipt, null));
+        }
+    }
+
+    private sealed class StubKillSwitchService : IKillSwitchService
+    {
+        public Task<bool> IsActiveAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult(false); // Always inactive for tests
+        }
+
+        public Task<KillSwitchStatus> GetStatusAsync(CancellationToken ct = default)
+        {
+            return Task.FromResult(new KillSwitchStatus(false, KillSwitchLevel.PAUSE_ALL, null, null));
+        }
+
+        public Task ActivateAsync(KillSwitchLevel level, string reason, string activatedBy, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeactivateAsync(string deactivatedBy, string reason, CancellationToken ct = default)
+        {
+            return Task.CompletedTask;
         }
     }
 }

@@ -1,10 +1,13 @@
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
+using Mvp.Trading.Api;
 using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Api.Models;
 using Mvp.Trading.Api.Services;
 using Mvp.Trading.Contracts;
-using Microsoft.Extensions.Options;
+using Mvp.Trading.Execution;
 using Npgsql;
 using StackExchange.Redis;
 
@@ -72,6 +75,19 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 
     return ConnectionMultiplexer.Connect(options.ConnectionString);
 });
+
+// Kill Switch configuration and service
+builder.Services.Configure<KillSwitchApiOptions>(builder.Configuration.GetSection("KillSwitch"));
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IKillSwitchService>(sp =>
+{
+    var postgresOpts = sp.GetRequiredService<IOptions<PostgresOptions>>().Value;
+    var cache = sp.GetRequiredService<IMemoryCache>();
+    var tradingProvider = sp.GetRequiredService<ITradingProvider>();
+    var logger = sp.GetRequiredService<ILogger<KillSwitchService>>();
+    return new KillSwitchService(postgresOpts.ConnectionString, cache, tradingProvider, logger);
+});
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {

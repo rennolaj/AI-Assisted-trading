@@ -205,6 +205,23 @@ public static class Program
         builder.Services.AddSingleton<IIndicatorSnapshotStore, PostgresIndicatorSnapshotStore>();
         builder.Services.AddSingleton<IElliottCandidatesStore, PostgresElliottCandidatesStore>();
         builder.Services.AddSingleton<IOpenTradeRepository, PostgresOpenTradeRepository>();
+
+        // Kill Switch service
+        builder.Services.AddMemoryCache();
+        builder.Services.AddSingleton<IKillSwitchService>(sp =>
+        {
+            var connectionString = builder.Configuration.GetSection("Postgres")["ConnectionString"];
+            if (string.IsNullOrWhiteSpace(connectionString))
+            {
+                throw new InvalidOperationException("Postgres connection string is required for kill switch.");
+            }
+            
+            var cache = sp.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+            var tradingProvider = sp.GetRequiredService<ITradingProvider>();
+            var logger = sp.GetRequiredService<ILogger<KillSwitchService>>();
+            return new KillSwitchService(connectionString, cache, tradingProvider, logger);
+        });
+
         builder.Services.AddHostedService<AlertWorker>();
         builder.Services.AddHostedService<TradeMonitorWorker>();
         builder.Services.AddHostedService<ReconciliationWorker>();
