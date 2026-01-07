@@ -7,8 +7,11 @@ using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Api.Models;
 using Mvp.Trading.Api.Services;
 using Mvp.Trading.Contracts;
+using Mvp.Trading.Contracts.Telemetry;
 using Mvp.Trading.Execution;
 using Npgsql;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -87,6 +90,25 @@ builder.Services.AddSingleton<IKillSwitchService>(sp =>
     var logger = sp.GetRequiredService<ILogger<KillSwitchService>>();
     return new KillSwitchService(postgresOpts.ConnectionString, cache, tradingProvider, logger);
 });
+
+// OpenTelemetry metrics
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("mvp-trading-api"))
+    .WithMetrics(metrics =>
+    {
+        metrics.AddMeter("Mvp.Trading");
+        metrics.AddAspNetCoreInstrumentation();
+        metrics.AddHttpClientInstrumentation();
+        metrics.AddPrometheusExporter();
+    });
+
+// Metrics service
+builder.Services.AddSingleton<IMetricsService, OpenTelemetryMetricsService>();
+
+// Health checks
+builder.Services.AddHealthChecks()
+    .AddNpgSql(sp => sp.GetRequiredService<IOptions<PostgresOptions>>().Value.ConnectionString!, name: "postgres")
+    .AddRedis(sp => sp.GetRequiredService<IOptions<RedisOptions>>().Value.ConnectionString!, name: "redis");
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -190,6 +212,27 @@ app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
     .WithSummary("Basic health check")
     .WithDescription("Confirms the API process is running.");
 
+app.MapHealthChecks("/health/dependencies")
+    .WithName("DependencyHealthCheck")
+    .WithTags("System")
+    .WithSummary("Dependency health check")
+    .WithDescription("Verifies Postgres and Redis connectivity using ASP.NET Core health checks.");
+
+app.MapHealthChecks("/health/ready")
+    .WithName("ReadinessCheck")
+    .WithTags("System")
+    .WithSummary("Readiness probe")
+    .WithDescription("Kubernetes readiness probe - checks if service can accept traffic.");
+
+app.MapHealthChecks("/health/live")
+    .WithName("LivenessCheck")
+    .WithTags("System")
+    .WithSummary("Liveness probe")
+    .WithDescription("Kubernetes liveness probe - checks if service is alive and should not be restarted.");
+
+app.MapPrometheusScrapingEndpoint()
+    .WithTags("Metrics");
+
 app.MapGet("/alerts/status/{idempotencyKey}", async (
         string idempotencyKey,
         IAlertProcessingQuery query,
@@ -253,34 +296,5 @@ app.MapPost("/trades/open", async (
     .WithTags("Trades")
     .WithSummary("Seed an open trade for monitoring.")
     .WithDescription("Creates an open trade record that the monitor worker will validate for invalidation.");
-
-app.MapGet("/health/dependencies", async (
-        NpgsqlDataSource dataSource,
-        IConnectionMultiplexer redis,
-        CancellationToken ct) =>
-    {
-        try
-        {
-            await using var conn = await dataSource.OpenConnectionAsync(ct);
-            await using var cmd = conn.CreateCommand();
-            cmd.CommandText = "select 1";
-            await cmd.ExecuteScalarAsync(ct);
-
-            await redis.GetDatabase().PingAsync();
-
-            return Results.Ok(new { status = "ok" });
-        }
-        catch (Exception ex)
-        {
-            return Results.Problem(
-                detail: ex.Message,
-                statusCode: StatusCodes.Status503ServiceUnavailable,
-                title: "Dependency health check failed");
-        }
-    })
-    .WithName("DependencyHealthCheck")
-    .WithTags("System")
-    .WithSummary("Dependency health check")
-    .WithDescription("Verifies Postgres and Redis connectivity.");
 
 app.Run();
