@@ -93,8 +93,48 @@
 - Story M7.3: Metrics and tracing (queue lag, errors, execution outcomes)
 **Done when**: failures fail closed; dashboards and alerts defined
 
+### M8 - AI-Driven Order Management
+**Goal**: intelligent order monitoring and management for open positions.
+- Story M8.1: Implement AI-driven order monitoring service
+  - Monitor open orders and positions in real-time
+  - AI decision-making for order modifications (close, partial close, break-even adjustment)
+  - Allow percentage-based partial exits while letting remainder run to maximum potential
+  - Break-even stop adjustment once profit thresholds reached
+  - Integration with risk policy and position sizing rules
+- Story M8.2: Define LLM decision schema for order management actions
+  - Schema for monitoring decision (HOLD, CLOSE_PARTIAL, CLOSE_ALL, ADJUST_STOP, MOVE_TO_BREAKEVEN)
+  - Percentage allocation rules for partial exits
+  - Confidence scoring and decision rationale
+- Story M8.3: Add MCP tools for order management adjudication
+  - monitorPosition tool with market context and position state
+  - Integration with existing risk engine and execution service
+- Story M8.4: Persistence layer for order management decisions and audit trail
+  - Track all AI-driven order modifications
+  - Maintain decision history for backtesting and analysis
+**Done when**: AI can monitor open orders, suggest and execute intelligent order modifications with full audit trail; partial profit-taking and break-even features validated in demo
+
+### M9 - LLM Test Fixtures and Validation
+**Goal**: comprehensive test fixtures with known-good LLM responses.
+- Story M9.1: Create positive-case Elliott wave fixtures
+  - Capture real market scenarios where LLM accepts the trade setup
+  - Document the specific market conditions, Elliott counts, and indicators
+  - Store LLM responses as source of truth for regression testing
+- Story M9.2: Build LLM response fixture library
+  - Organize fixtures by scenario type (strong impulse, clear correction, ambiguous)
+  - Include both acceptance and rejection cases with reasoning
+  - Version fixtures with LLM model and prompt version metadata
+- Story M9.3: Implement fixture-based integration tests
+  - Test pipeline with known-good scenarios
+  - Validate schema compliance across all positive cases
+  - Detect prompt/model drift by comparing against baseline responses
+- Story M9.4: Add fixture capture tooling
+  - Script to run alerts and capture LLM decisions
+  - Metadata tagging (market conditions, timeframe, confidence)
+  - Semi-automated review workflow for fixture quality
+**Done when**: test suite includes 10+ positive LLM acceptance cases; fixtures serve as regression suite; tooling exists to capture and review new fixtures
+
 ## Implementation Order (Suggested)
-- M0, M1, M2, M3, M4, M5, M6, M7
+- M0, M1, M2, M3, M4, M5, M6, M7, M8, M9
 
 ## Open Decisions
 - Exact .NET SDK version to target for CI

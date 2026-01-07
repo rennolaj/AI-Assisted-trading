@@ -14,7 +14,8 @@ RUN ./scripts/dotnet.sh publish src/Mvp.Trading.Worker/Mvp.Trading.Worker.csproj
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
-ENV KrakenFutures__Environment=prod
+# Environment is set via docker-compose.yml or .env file
+# See docs/environment-switching.md for safe environment management
 
 COPY --from=build /app/publish ./
 

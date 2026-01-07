@@ -26,6 +26,39 @@ When using a local LLM, configure `LOCAL_LLM_BASE_URL` and optionally `LOCAL_LLM
 For LM Studio, use `LOCAL_LLM_BASE_URL=http://localhost:1234/v1/` and `LOCAL_LLM_MODE=chat`.
 See `docs/local-llm-options.md` for local runtime/model notes.
 
+### Environment Switching for Docker
+For safe environment management (simulated/demo/prod), use the environment switcher:
+
+```bash
+# Switch to simulated environment
+./scripts/switch-env.sh simulated
+
+# Update .env to match (docker-compose environment variable)
+# For simulated, set: KRAKEN_FUTURES_ENV=demo (uses simulated mode internally)
+# Then rebuild containers
+docker compose up --build
+```
+
+```bash
+# Switch to demo environment
+./scripts/switch-env.sh demo
+
+# Update .env to match
+# Set: KRAKEN_FUTURES_ENV=demo
+docker compose up --build
+```
+
+```bash
+# Switch to production (requires CONFIRM=yes)
+CONFIRM=yes ./scripts/switch-env.sh prod
+
+# Update .env to match
+# Set: KRAKEN_FUTURES_ENV=prod
+docker compose up --build
+```
+
+⚠️ **Important**: The switch-env.sh script updates `config/execution.json` which is copied into the Docker image at build time. Always rebuild containers after switching environments. See `docs/environment-switching.md` for detailed guidance and safety checklists.
+
 ## Smoke test (ngrok)
 This uses `scripts/smoke.sh` plus a local `.env.smoke` file (not committed).
 
