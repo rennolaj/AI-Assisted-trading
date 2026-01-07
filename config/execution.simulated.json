@@ -1,0 +1,8 @@
+{
+  "mode": "SIMULATED",
+  "slippageCapPct": 0.0,
+  "heartbeatIntervalSeconds": 10,
+  "staleThresholdSeconds": 30,
+  "maxOrderRetries": 0,
+  "_note": "No real API calls, fully simulated execution"
+}

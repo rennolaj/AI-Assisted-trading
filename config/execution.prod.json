@@ -1,0 +1,10 @@
+{
+  "mode": "KRAKEN_LIVE",
+  "slippageCapPct": 0.001,
+  "heartbeatIntervalSeconds": 10,
+  "staleThresholdSeconds": 30,
+  "maxOrderRetries": 2,
+  "krakenBaseUrl": "https://futures.kraken.com/derivatives/api/v3",
+  "krakenAuthBaseUrl": "https://futures.kraken.com/api/auth/v1",
+  "_warning": "PRODUCTION MODE - REAL MONEY AT RISK"
+}
