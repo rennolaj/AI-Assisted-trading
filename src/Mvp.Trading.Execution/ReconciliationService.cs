@@ -37,16 +37,10 @@ public sealed class ReconciliationService : IReconciliationService
         {
             // 1. Get all active execution intents (not completed/failed)
             var activeIntents = await _intentStore.GetActiveAsync(ct);
-            
-            if (activeIntents.Count == 0)
-            {
-                _logger.LogInformation("No active executions to reconcile");
-                return new Result<ReconciliationResult>(true, new ReconciliationResult(0, 0, Array.Empty<ReconciliationDiscrepancy>()), null);
-            }
 
             // 2. Get open orders from exchange
             var openOrdersResult = await _tradingProvider.GetOpenOrdersAsync(ct);
-            if (!openOrdersResult.Ok)
+            if (!openOrdersResult.Ok || openOrdersResult.Value == null)
             {
                 _logger.LogError("Failed to fetch open orders from exchange: {Error}", openOrdersResult.Error?.Message);
                 return new Result<ReconciliationResult>(false, default, openOrdersResult.Error);
@@ -66,6 +60,7 @@ public sealed class ReconciliationService : IReconciliationService
             }
 
             // 4. Check for orphaned orders (on exchange but not in our system)
+            // This includes orders on exchange when we have no active intents
             foreach (var orphan in exchangeOrders.Values)
             {
                 var discrepancy = new ReconciliationDiscrepancy(
