@@ -136,10 +136,30 @@ Sets up the local development environment on Windows.
 
 ## Docker Build Support
 
-The Dockerfiles have been updated to support both bash (Linux) and PowerShell scripts. When building in Docker:
+The Dockerfiles have been updated to support both bash (Linux) and PowerShell scripts with smart detection. When building in Docker:
 
 1. **Linux containers** (default): Use bash scripts
-2. **Windows containers**: Automatically fall back to PowerShell scripts
+2. **Windows containers**: Automatically detect and use PowerShell
+   - Tries PowerShell Core (`pwsh`) first
+   - Falls back to Windows PowerShell (`powershell`) if needed
+
+### PowerShell Detection Strategy
+
+The Dockerfiles use a three-tier fallback:
+```dockerfile
+# Try bash first (Linux)
+RUN ./scripts/restore.sh || \
+    # Try PowerShell Core (modern)
+    (pwsh -File ./scripts/restore.ps1 2>/dev/null || \
+     # Fall back to Windows PowerShell (legacy)
+     powershell -File ./scripts/restore.ps1)
+```
+
+This ensures compatibility with:
+- **Linux containers**: Use bash (standard)
+- **Windows Server Core**: Use Windows PowerShell 5.1
+- **Windows containers with PowerShell Core**: Use pwsh 7+
+- **Command line builds**: Works from both CMD and PowerShell
 
 ### Building Docker Images on Windows
 
