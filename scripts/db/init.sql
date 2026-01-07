@@ -117,8 +117,29 @@ create table if not exists reconciliation_state (
     execution_id uuid primary key references execution_intent(execution_id),
     status text not null,
     details text,
-    last_checked_utc timestamptz not null
+    last_checked_utc timestamptz not null,
+    reconciliation_type text not null default 'OPEN_ORDERS',
+    discrepancy_count int not null default 0,
+    last_error text
 );
+
+create table if not exists reconciliation_discrepancy (
+    discrepancy_id uuid primary key default gen_random_uuid(),
+    execution_id uuid references execution_intent(execution_id),
+    detected_at_utc timestamptz not null default now(),
+    discrepancy_type text not null,
+    internal_state jsonb not null,
+    exchange_state jsonb not null,
+    details text,
+    resolved boolean not null default false,
+    resolved_at_utc timestamptz,
+    resolution_notes text
+);
+
+create index if not exists idx_reconciliation_discrepancy_execution on reconciliation_discrepancy(execution_id);
+create index if not exists idx_reconciliation_discrepancy_detected on reconciliation_discrepancy(detected_at_utc);
+create index if not exists idx_reconciliation_discrepancy_unresolved on reconciliation_discrepancy(resolved) where resolved = false;
+create index if not exists idx_reconciliation_discrepancy_type on reconciliation_discrepancy(discrepancy_type);
 
 create table if not exists daily_risk (
     risk_date date primary key,

@@ -141,6 +141,11 @@ public static class Program
         builder.Services.AddSingleton<IExecutionHeartbeatStore, PostgresExecutionHeartbeatStore>();
         builder.Services.AddSingleton<IExecutionService, ExecutionService>();
 
+        // Reconciliation services
+        builder.Services.Configure<ReconciliationOptions>(builder.Configuration.GetSection("Reconciliation"));
+        builder.Services.AddSingleton<IReconciliationStore, PostgresReconciliationStore>();
+        builder.Services.AddSingleton<IReconciliationService, ReconciliationService>();
+
         builder.Services.Configure<OpenAiOptions>(builder.Configuration.GetSection("OpenAI"));
         builder.Services.Configure<LocalLlmOptions>(builder.Configuration.GetSection("LocalLlm"));
         builder.Services.Configure<McpProviderOptions>(builder.Configuration.GetSection("McpProvider"));
@@ -202,6 +207,7 @@ public static class Program
         builder.Services.AddSingleton<IOpenTradeRepository, PostgresOpenTradeRepository>();
         builder.Services.AddHostedService<AlertWorker>();
         builder.Services.AddHostedService<TradeMonitorWorker>();
+        builder.Services.AddHostedService<ReconciliationWorker>();
 
         await builder.Build().RunAsync();
     }

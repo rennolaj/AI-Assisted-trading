@@ -44,4 +44,32 @@ values (@receipt_id, @execution_id, @order_kind, @client_order_id, @exchange_ord
 
         await cmd.ExecuteNonQueryAsync(ct);
     }
+
+    public async Task<IReadOnlyList<OrderReceipt>> GetByExecutionIdAsync(Guid executionId, CancellationToken ct = default)
+    {
+        const string sql = @"
+select client_order_id, exchange_order_id, status, qty, price
+from order_receipt
+where execution_id = @execution_id
+order by created_at_utc";
+
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("execution_id", executionId);
+        await using var reader = await cmd.ExecuteReaderAsync(ct);
+
+        var results = new List<OrderReceipt>();
+        while (await reader.ReadAsync(ct))
+        {
+            results.Add(new OrderReceipt(
+                reader.GetString(0),
+                await reader.IsDBNullAsync(1, ct) ? null : reader.GetString(1),
+                reader.GetString(2),
+                await reader.IsDBNullAsync(3, ct) ? null : reader.GetDecimal(3),
+                await reader.IsDBNullAsync(4, ct) ? null : reader.GetDecimal(4)
+            ));
+        }
+
+        return results;
+    }
 }
