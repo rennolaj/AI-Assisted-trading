@@ -26,6 +26,47 @@ This directory contains PowerShell equivalents of all bash scripts needed for bu
 
 ## Available Scripts
 
+### Docker/Deployment Scripts
+
+#### `get-ngrok-url.ps1` ✨ NEW
+Gets the public webhook URL from a running ngrok container.
+
+```powershell
+.\scripts\get-ngrok-url.ps1
+```
+
+**What it does:**
+1. Checks if ngrok container is running
+2. Retrieves the public tunnel URL
+3. Displays the complete TradingView webhook URL
+4. Provides troubleshooting tips if ngrok isn't running
+
+**Requirements:**
+- Docker and docker-compose running
+- ngrok container started with: `docker compose --profile ngrok up -d`
+- `NGROK_AUTHTOKEN` configured in your .env file
+
+**Equivalent to:**
+```bash
+./scripts/get-ngrok-url.sh
+```
+
+**See also:** [ngrok Docker Guide](../docs/ngrok-docker-guide.md)
+
+### Scripts Without PowerShell Versions (Yet)
+
+The following scripts currently only have bash versions. They work in Docker (which uses Linux containers) but aren't needed for Windows local development:
+
+- **`smoke.sh`** - End-to-end smoke testing (Docker-based, works on Windows via Docker)
+- **`switch-env.sh`** - Environment switching (simulated/demo/prod)
+- **`validate-audit-chain.sh`** - Audit chain validation
+- **`validate-audit-chain-docker.sh`** - Docker-based audit validation
+
+These scripts can be run on Windows using:
+1. **Git Bash** (comes with Git for Windows)
+2. **WSL (Windows Subsystem for Linux)**
+3. **Docker** (scripts run inside Linux containers)
+
 ### Core Build Scripts
 
 #### `dotnet.ps1`
