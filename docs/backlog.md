@@ -88,10 +88,11 @@
 
 ### M7 - Hardening and Observability
 **Goal**: resilience, monitoring, and reconciliation.
-- Story M7.1: Reconciliation loop for orders/positions
-- Story M7.2: Kill switch and fail-closed chaos tests
-- Story M7.3: Metrics and tracing (queue lag, errors, execution outcomes)
+- Story M7.1: Reconciliation loop for orders/positions ✅
+- Story M7.2: Kill switch and fail-closed chaos tests ✅
+- Story M7.3: Metrics and tracing (queue lag, errors, execution outcomes) ✅
 **Done when**: failures fail closed; dashboards and alerts defined
+**Status**: Core implementation complete; optional dashboard updates and alerting rules remain
 
 ### M8 - AI-Driven Order Management
 **Goal**: intelligent order monitoring and management for open positions.
