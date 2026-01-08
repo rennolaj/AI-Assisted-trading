@@ -67,6 +67,7 @@ services:
       KrakenFutures__TimeoutSeconds: "${KRAKEN_FUTURES_TIMEOUT_SECONDS:-10}"
       Elliott__BaseTimeframe: "${ELLIOTT_BASE_TIMEFRAME:-M1}"
       Elliott__LookbackDays: "${ELLIOTT_LOOKBACK_DAYS:-1}"
+      Elliott__Parameters__DeviationPct: "${ELLIOTT_PARAMETERS_DEVIATION_PCT:-5}"
       MarketData__Mode: "${MARKETDATA_MODE:-kraken}"
       MarketData__FixturesPath: "${MARKETDATA_FIXTURE_PATH:-fixtures/kraken-futures}"
       MarketData__ExtendFixtures: "${MARKETDATA_EXTEND_FIXTURES:-true}"
