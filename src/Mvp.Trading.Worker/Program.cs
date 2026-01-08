@@ -231,7 +231,7 @@ public static class Program
             .WithMetrics(metrics =>
             {
                 metrics.AddMeter("Mvp.Trading");
-                metrics.AddPrometheusHttpListener(options => options.UriPrefixes = new[] { "http://localhost:9464/" });
+                metrics.AddPrometheusHttpListener(options => options.UriPrefixes = new[] { "http://+:9464/" });
             });
 
         // Metrics service
