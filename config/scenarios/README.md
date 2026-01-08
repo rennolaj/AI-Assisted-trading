@@ -18,39 +18,42 @@ Files:
 
 ### 2. Fractional - $100 Equity
 - **Equity:** $100
-- **qtyStep:** 0.001 (fractional contracts, 1/1000th)
-- **minQty:** 0.001
+- **qtyStep:** 0.0002 (1/5000th of whole contract)
+- **minQty:** 0.0002
 - **Use Case:** Testing micro-account position sizing
 - **Risk:** 1% = $1.00
 - **Expected BTC position:** ~0.0004 contracts (~$33 notional)
+- **Risk Profile:** Same as $500k setup (proportionally scaled)
 
 Files:
 - `account.fractional-100.json`
-- `instruments.fractional-qtystep0001.json`
+- `instruments.fractional-100.json` (qtyStep=0.0002)
 
 ### 3. Fractional - $1,000 Equity
 - **Equity:** $1,000
-- **qtyStep:** 0.001
-- **minQty:** 0.001
+- **qtyStep:** 0.002 (1/500th of whole contract)
+- **minQty:** 0.002
 - **Use Case:** Testing small retail account
 - **Risk:** 1% = $10.00
 - **Expected BTC position:** ~0.004 contracts (~$330 notional)
+- **Risk Profile:** Same as $500k setup (proportionally scaled)
 
 Files:
 - `account.fractional-1000.json`
-- `instruments.fractional-qtystep0001.json`
+- `instruments.fractional-1000.json` (qtyStep=0.002)
 
 ### 4. Fractional - $10,000 Equity
 - **Equity:** $10,000
-- **qtyStep:** 0.001
-- **minQty:** 0.001
+- **qtyStep:** 0.02 (1/50th of whole contract)
+- **minQty:** 0.02
 - **Use Case:** Testing medium retail account
 - **Risk:** 1% = $100.00
 - **Expected BTC position:** ~0.04 contracts (~$3,300 notional)
+- **Risk Profile:** Same as $500k setup (proportionally scaled)
 
 Files:
 - `account.fractional-10000.json`
-- `instruments.fractional-qtystep0001.json`
+- `instruments.fractional-10000.json` (qtyStep=0.02)
 
 ## Position Sizing Math
 
@@ -60,14 +63,21 @@ Where:
 - `riskAmount = equity × (maxAccountRiskPctPerTrade / 100)`
 - `pointRisk = stopDistance × contractMultiplier`
 
+**KEY PRINCIPLE:** qtyStep scales proportionally with equity to maintain consistent risk profile:
+```
+qtyStep = (equity / 500000) × 1
+```
+
 ### Example with 3% Stop on BTC @ $82,000
 
-| Equity | Risk % | Risk $ | Stop Distance | Point Risk | Qty | Notional |
-|--------|--------|--------|---------------|------------|-----|----------|
-| $100 | 1% | $1 | $2,460 | $2,460 | 0.0004 | $33 |
-| $1,000 | 1% | $10 | $2,460 | $2,460 | 0.0041 | $336 |
-| $10,000 | 1% | $100 | $2,460 | $2,460 | 0.0407 | $3,337 |
-| $500,000 | 1% | $5,000 | $2,460 | $2,460 | 2.03 → 2 | $164,000 |
+| Equity | Risk % | Risk $ | Stop Distance | qtyStep | Qty | Notional | Actual Risk % |
+|--------|--------|--------|---------------|---------|-----|----------|---------------|
+| $100 | 1% | $1 | $2,460 | 0.0002 | 0.0004 | $33 | 0.98% |
+| $1,000 | 1% | $10 | $2,460 | 0.002 | 0.004 | $328 | 0.98% |
+| $10,000 | 1% | $100 | $2,460 | 0.02 | 0.04 | $3,280 | 0.98% |
+| $500,000 | 1% | $5,000 | $2,460 | 1 | 2 | $164,000 | 0.98% |
+
+**Notice:** All scenarios achieve ~0.98% actual risk (consistent across all equity levels)
 
 ## Switching Scenarios
 

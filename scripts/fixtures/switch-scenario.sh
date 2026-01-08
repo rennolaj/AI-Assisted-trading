@@ -51,21 +51,21 @@ case "$SCENARIO" in
         ;;
     fractional-100)
         ACCOUNT_FILE="account.fractional-100.json"
-        INSTRUMENTS_FILE="instruments.fractional-qtystep0001.json"
+        INSTRUMENTS_FILE="instruments.fractional-100.json"
         EQUITY="\$100"
-        QTY_STEP="0.001"
+        QTY_STEP="0.0002"
         ;;
     fractional-1000)
         ACCOUNT_FILE="account.fractional-1000.json"
-        INSTRUMENTS_FILE="instruments.fractional-qtystep0001.json"
+        INSTRUMENTS_FILE="instruments.fractional-1000.json"
         EQUITY="\$1,000"
-        QTY_STEP="0.001"
+        QTY_STEP="0.002"
         ;;
     fractional-10000)
         ACCOUNT_FILE="account.fractional-10000.json"
-        INSTRUMENTS_FILE="instruments.fractional-qtystep0001.json"
+        INSTRUMENTS_FILE="instruments.fractional-10000.json"
         EQUITY="\$10,000"
-        QTY_STEP="0.001"
+        QTY_STEP="0.02"
         ;;
     *)
         echo -e "${RED}Error: Unknown scenario '$SCENARIO'${NC}"
