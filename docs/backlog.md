@@ -114,25 +114,29 @@
   - Maintain decision history for backtesting and analysis
 **Done when**: AI can monitor open orders, suggest and execute intelligent order modifications with full audit trail; partial profit-taking and break-even features validated in demo
 
-### M9 - LLM Test Fixtures and Validation
+### M9 - LLM Test Fixtures and Validation (IN PROGRESS - 50%)
 **Goal**: comprehensive test fixtures with known-good LLM responses.
-- Story M9.1: Create positive-case Elliott wave fixtures
-  - Capture real market scenarios where LLM accepts the trade setup
-  - Document the specific market conditions, Elliott counts, and indicators
-  - Store LLM responses as source of truth for regression testing
-- Story M9.2: Build LLM response fixture library
-  - Organize fixtures by scenario type (strong impulse, clear correction, ambiguous)
-  - Include both acceptance and rejection cases with reasoning
-  - Version fixtures with LLM model and prompt version metadata
-- Story M9.3: Implement fixture-based integration tests
-  - Test pipeline with known-good scenarios
-  - Validate schema compliance across all positive cases
-  - Detect prompt/model drift by comparing against baseline responses
-- Story M9.4: Add fixture capture tooling
-  - Script to run alerts and capture LLM decisions
-  - Metadata tagging (market conditions, timeframe, confidence)
-  - Semi-automated review workflow for fixture quality
+- Story M9.1: Create fixture capture infrastructure ✅
+  - Built `capture-llm-decision.sh` to extract full context from database
+  - Created directory structure (`tests/fixtures/llm-decisions/{accept,reject}`)
+  - Captured initial REJECT fixtures from production
+  - Explored ForceAllow approach (not viable for synthetic data)
+- Story M9.2: Build LLM response fixture library (IN PROGRESS)
+  - Captured 3 REJECT cases with full context (webhook, indicators, Elliott, LLM decision)
+  - Need to capture ALLOW cases from real TradingView alerts with valid Elliott patterns
+  - Requires monitoring production for 2-3 days to collect diverse scenarios
+  - ForceAllow cannot generate synthetic fixtures (needs 5+ pivots, real market data)
+- Story M9.3: Implement fixture-based integration tests (BLOCKED by M9.2)
+  - Need fixture library completed first
+  - Will replay scenarios and validate system behavior
+  - Test both ALLOW and REJECT paths with known outcomes
+- Story M9.4: Add fixture capture tooling ✅
+  - `capture-llm-decision.sh` script complete (239 lines)
+  - `generate-positive-fixture.sh` created but requires real data
+  - Metadata includes: LLM model, prompt version, decision, status, timestamp
+  - JSON validation and auto-categorization working
 **Done when**: test suite includes 10+ positive LLM acceptance cases; fixtures serve as regression suite; tooling exists to capture and review new fixtures
+**Status**: Infrastructure complete, waiting for real alerts to build fixture library
 
 ## Implementation Order (Suggested)
 - M0, M1, M2, M3, M4, M5, M6, M7, M8, M9

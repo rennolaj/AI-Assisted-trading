@@ -1,0 +1,41 @@
+{
+  "metadata": {
+    "captureDate": "2026-01-08T14:16:17Z",
+    "idempotencyKey": "m7-metrics-test-1767881227",
+    "alertId": "68153fc1-330e-4080-af03-334fa408dd78",
+    "llmProvider": "local",
+    "llmModel": "openai/gpt-oss-20b",
+    "promptVersion": "1.0",
+    "schemaVersion": "1.0.0",
+    "description": "Test alert with insufficient Elliott confidence",
+    "scenario": "LONG entry attempt with weak wave structure",
+    "expectedDecision": "REJECT",
+    "processingStatus": "rejected",
+    "category": "reject"
+  },
+  "input": {
+    "alertPayload": {
+    "idempotencyKey": "m7-metrics-test-1767881227",
+    "ticker": "BTC/USD",
+    "exchange": "KRAKEN",
+    "interval": "15m",
+    "close": 43000.00,
+    "volume": 150.0,
+    "directionHint": "LONG",
+    "symbolHint": "PF_XBTUSD",
+    "reason": "M7.3 metrics test"
+  },
+    "indicatorSnapshot": {"mode": "scalping_default", "risk": {"action": "REJECT_DEFAULT", "category": "INVALID", "trendRequired": false, "riskMultiplier": 0, "minConfirmations": 0, "counterTrendAllowed": false}, "gates": {"dataIntegrity": true, "rsiExtremeAnchor": false, "directionDeclared": true}, "score": {"score": 0, "maxScore": 100, "scorePercent": 0, "confirmations": 0}, "symbol": "PF_XBTUSD", "alertId": "68153fc1-330e-4080-af03-334fa408dd78", "direction": "LONG", "parameters": {"macdFast": 12, "macdSlow": 26, "rsiPeriod": 14, "macdSignal": 9, "volumeRule": {"mode": "SMA_RATIO", "period": 20, "threshold": 1.5}, "stochRsiPeriod": 14}, "timeframes": [{"tf": "M5", "rsi": {"state": "NEUTRAL", "value": 36.956292}, "macd": {"hist": -8.413285, "macd": -47.447412, "state": "BEARISH", "signal": -39.034127}, "volume": {"rule": "SMA_RATIO:20:1.5", "state": "CONFIRMED", "value": 3.143435}, "stochRsi": {"d": 17.338195, "k": 11.860904, "state": "OVERSOLD"}}, {"tf": "M15", "rsi": {"state": "NEUTRAL", "value": 41.933567}, "macd": {"hist": 15.416739, "macd": -138.839629, "state": "BULLISH", "signal": -154.256368}, "volume": {"rule": "SMA_RATIO:20:1.5", "state": "WEAK", "value": 0.469127}, "stochRsi": {"d": 51.910364, "k": 48.450328, "state": "NEUTRAL"}}, {"tf": "M30", "rsi": {"state": "NEUTRAL", "value": 39.215398}, "macd": {"hist": -6.829960, "macd": -271.743017, "state": "BEARISH", "signal": -264.913057}, "volume": {"rule": "SMA_RATIO:20:1.5", "state": "WEAK", "value": 0.385113}, "stochRsi": {"d": 60.545897, "k": 54.174928, "state": "NEUTRAL"}}, {"tf": "H1", "rsi": {"state": "NEUTRAL", "value": 35.394510}, "macd": {"hist": -18.393209, "macd": -539.084567, "state": "BEARISH", "signal": -520.691358}, "volume": {"rule": "SMA_RATIO:20:1.5", "state": "WEAK", "value": 0.270460}, "stochRsi": {"d": 75.331333, "k": 70.382330, "state": "NEUTRAL"}}, {"tf": "H2", "rsi": {"state": "NEUTRAL", "value": 30.125768}, "macd": {"hist": -51.777009, "macd": -937.427118, "state": "BEARISH", "signal": -885.650109}, "volume": {"rule": "SMA_RATIO:20:1.5", "state": "WEAK", "value": 0.710116}, "stochRsi": {"d": 7.646477, "k": 13.262245, "state": "OVERSOLD"}}], "computedAtUtc": "2026-01-08T14:07:08.0575118+00:00", "confirmations": {"rsiMultiTf": false, "macdMomentum": false, "volumeConfirm": false, "trendAlignment": false, "stochRsiReversal": false, "counterTrendVolumeOk": false}, "correlationId": "90e1be27-e10a-4a4c-bd9e-6f7307815212", "trendTimeframe": "H2", "anchorTimeframe": "M30", "evaluationTimeUtc": "2026-01-08T14:07:08.0575118+00:00"},
+    "elliottCandidates": {"candidates": [{"score": 0, "waveLabel": "OTHER", "confidence": 0, "candidateId": "17c6bf8da18b25b8", "patternType": "IMPULSE", "invalidation": {"longInvalidationPrice": null, "shortInvalidationPrice": null}, "ruleViolations": [{"rule": "EW_PIVOTS_INSUFFICIENT", "details": "Only 0 pivots available.", "severity": "ERROR"}]}], "baseTimeframe": "M1"}
+  },
+  "output": {
+    "decision": "REJECT",
+    "status": "rejected",
+    "errorMessage": "LLM_DECISION:REJECT"
+  },
+  "validation": {
+    "captured": true,
+    "dataComplete": true,
+    "needsReview": true
+  }
+}

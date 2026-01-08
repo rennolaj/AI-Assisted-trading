@@ -1,0 +1,7 @@
+{
+  "accountId": "prod-test",
+  "currency": "USD",
+  "equity": 10,
+  "dailyRiskUsed": 0,
+  "_comment": "PRODUCTION TEST MODE - Very low equity to limit order sizes to ~$10 max"
+}
