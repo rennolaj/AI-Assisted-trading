@@ -103,11 +103,9 @@ rsiMultiTfLong = rsi <= rsiOversold and rsi[1] <= rsiOversold + 5
 rsiMultiTfShort = rsi >= rsiOverbought and rsi[1] >= rsiOverbought - 5
 
 // 3. Stochastic RSI Reversal
-stochReversalLong = (prevStochK <= stochOversold and prevStochD <= stochOversold) and 
-                    (prevStochK <= prevStochD) and (stochRsiK > stochRsiD)
+stochReversalLong = (prevStochK <= stochOversold and prevStochD <= stochOversold) and (prevStochK <= prevStochD) and (stochRsiK > stochRsiD)
 
-stochReversalShort = (prevStochK >= stochOverbought and prevStochD >= stochOverbought) and 
-                     (prevStochK >= prevStochD) and (stochRsiK < stochRsiD)
+stochReversalShort = (prevStochK >= stochOverbought and prevStochD >= stochOverbought) and (prevStochK >= prevStochD) and (stochRsiK < stochRsiD)
 
 // 4. MACD Momentum
 macdMomentumLong = macdLine > signalLine and histLine > 0 and histLine > prevHist
@@ -153,16 +151,10 @@ if volumeConfirmed
 // ----------------------
 
 // LONG Setup: RSI oversold + minimum confirmations
-longSetup = rsiOversoldZone and 
-            countLongConfirmations >= minConfirmations and
-            (not requireTrend or trendAlignedLong) and
-            (not requireVolume or volumeConfirmed)
+longSetup = rsiOversoldZone and countLongConfirmations >= minConfirmations and (not requireTrend or trendAlignedLong) and (not requireVolume or volumeConfirmed)
 
 // SHORT Setup: RSI overbought + minimum confirmations  
-shortSetup = rsiOverboughtZone and 
-             countShortConfirmations >= minConfirmations and
-             (not requireTrend or trendAlignedShort) and
-             (not requireVolume or volumeConfirmed)
+shortSetup = rsiOverboughtZone and countShortConfirmations >= minConfirmations and (not requireTrend or trendAlignedShort) and (not requireVolume or volumeConfirmed)
 
 // ----------------------
 // Visualization
