@@ -115,14 +115,16 @@
 **Done when**: AI can monitor open orders, suggest and execute intelligent order modifications with full audit trail; partial profit-taking and break-even features validated in demo
 
 ### M9 - LLM Test Fixtures and Validation (IN PROGRESS - 50%)
-**Goal**: comprehensive test fixtures with known-good LLM responses.
+**Goal**: comprehensive test fixtures with known-good LLM responses and end-to-end dataflow validation.
 - Story M9.1: Create fixture capture infrastructure ✅
   - Built `capture-llm-decision.sh` to extract full context from database
   - Created directory structure (`tests/fixtures/llm-decisions/{accept,reject}`)
   - Captured initial REJECT fixtures from production
   - Explored ForceAllow approach (not viable for synthetic data)
+  - Built multi-scenario testing framework ($100, $1k, $10k, $500k equity levels) ✅
+  - Fixed qtyStep proportionality bug (maintain consistent risk profile) ✅
 - Story M9.2: Build LLM response fixture library (IN PROGRESS)
-  - Captured 3 REJECT cases with full context (webhook, indicators, Elliott, LLM decision)
+  - Captured 5 REJECT cases with full context (webhook, indicators, Elliott, LLM decision)
   - Need to capture ALLOW cases from real TradingView alerts with valid Elliott patterns
   - Requires monitoring production for 2-3 days to collect diverse scenarios
   - ForceAllow cannot generate synthetic fixtures (needs 5+ pivots, real market data)
@@ -135,8 +137,24 @@
   - `generate-positive-fixture.sh` created but requires real data
   - Metadata includes: LLM model, prompt version, decision, status, timestamp
   - JSON validation and auto-categorization working
-**Done when**: test suite includes 10+ positive LLM acceptance cases; fixtures serve as regression suite; tooling exists to capture and review new fixtures
-**Status**: Infrastructure complete, waiting for real alerts to build fixture library
+- Story M9.5: Re-evaluate indicator + Elliott pipeline integration (NEW - PRIORITY)
+  - Analyze production Pine Script alert combinations (LONG/SHORT signals)
+  - Cross-reference with Elliott engine triggers and candidate generation
+  - Validate that indicator conditions properly filter Elliott analysis
+  - Document all possible alert scenarios (high/medium/low risk × LONG/SHORT)
+  - Prepare comprehensive test matrix covering all alert types
+  - Create fixtures for each scenario: ACCEPT (valid Elliott alignment) and REJECT (misalignment/no candidates)
+  - Validate that dataflow from Pine → Indicators → Elliott → LLM is logically consistent
+- Story M9.6: Full dataflow analysis and validation plan (NEW - PRIORITY)
+  - Document complete end-to-end dataflow from TradingView alert to trade execution
+  - Map data transformations at each stage (webhook → indicator snapshot → Elliott candidates → LLM decision → trade plan)
+  - Identify validation checkpoints and cross-reference points
+  - Create validation plan to verify logical consistency across all pipeline stages
+  - Document expected behavior for each alert type through entire pipeline
+  - Define acceptance criteria for "correct" vs "incorrect" pipeline behavior
+  - See: `docs/alert-dataflow-overview.md` for existing partial documentation
+**Done when**: test suite includes 10+ positive LLM acceptance cases; fixtures serve as regression suite; tooling exists to capture and review new fixtures; complete alert scenario matrix documented; full dataflow validated for logical consistency
+**Status**: Infrastructure complete, scenario framework built, need dataflow validation and comprehensive fixture matrix
 
 ## Implementation Order (Suggested)
 - M0, M1, M2, M3, M4, M5, M6, M7, M8, M9
