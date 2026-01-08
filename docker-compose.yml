@@ -80,6 +80,8 @@ services:
       Redis__AlertQueueKey: "${REDIS_ALERT_QUEUE_KEY:-mvp:alerts}"
     ports:
       - "9464:9464"
+    volumes:
+      - ./tests/fixtures:/app/tests/fixtures:ro
     depends_on:
       - redis
       - postgres
