@@ -322,6 +322,11 @@ public sealed class AlertWorker : BackgroundService
     private async Task<RedisValue> DequeueAsync(CancellationToken ct)
     {
         var db = _redis.GetDatabase();
+        
+        // Update queue depth gauge
+        var queueLength = await db.ListLengthAsync(_options.AlertQueueKey).ConfigureAwait(false);
+        _metricsService.SetQueueDepthGauge((int)queueLength);
+        
         return await db.ListLeftPopAsync(_options.AlertQueueKey).ConfigureAwait(false);
     }
 
