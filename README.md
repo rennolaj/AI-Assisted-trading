@@ -14,17 +14,39 @@ brew install --cask dotnet-sdk
 ```
 
 ## Docker
+
+### Quick Start (Local Development)
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
+
+### With TradingView Webhook Access (ngrok)
+```bash
+# Copy and configure environment
+cp .env.demo .env.demo.local
+nano .env.demo.local  # Add NGROK_AUTHTOKEN and other credentials
+
+# Start with ngrok enabled
+docker compose --env-file .env.demo.local --profile ngrok up --build -d
+
+# Get your webhook URL
+./scripts/get-ngrok-url.sh
+```
+
+See [ngrok Quick Start](docs/ngrok-quickstart.md) for complete webhook setup.
+
+### Configuration
+
 Set `KRAKEN_FUTURES_ENV=demo` (sandbox) or `KRAKEN_FUTURES_ENV=prod` (live) in `.env` to switch Kraken Futures environments.
 Endpoint defaults live in `config/kraken-futures.json`.
 Set `OPENAI_API_KEY` in `.env` for MCP adjudication (keep it local, never commit secrets).
 Set `MCP_PROVIDER=openai|local|auto` to choose OpenAI, a local LLM, or OpenAI with local fallback on 429.
 When using a local LLM, configure `LOCAL_LLM_BASE_URL` and optionally `LOCAL_LLM_MODEL_OVERRIDE`.
-For LM Studio, use `LOCAL_LLM_BASE_URL=http://localhost:1234/v1/` and `LOCAL_LLM_MODE=chat`.
+For LM Studio, use `LOCAL_LLM_BASE_URL=http://host.docker.internal:1234/v1/` and `LOCAL_LLM_MODE=chat`.
 See `docs/local-llm-options.md` for local runtime/model notes.
+
+**Complete environment file documentation:** [Environment Files Guide](docs/environment-files.md)
 
 ### Environment Switching for Docker
 For safe environment management (simulated/demo/prod), use the environment switcher:
