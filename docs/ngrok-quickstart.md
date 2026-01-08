@@ -44,7 +44,7 @@ curl -s http://localhost:4040/api/tunnels | \
 
 Use the URL from step 4 in your TradingView alert:
 ```
-https://abc123.ngrok-free.app/webhooks/tradingview/alert?secret=your-webhook-secret
+https://abc123.ngrok-free.app/webhooks/tradingview/your-webhook-secret
 ```
 
 ## Commands
@@ -189,7 +189,7 @@ open http://localhost:4040
 2. ✅ API running? `docker compose ps api`  
 3. ✅ Correct URL? `./scripts/get-ngrok-url.sh`
 4. ✅ Correct secret? Check .env.demo.local
-5. ✅ Full URL: `https://xxx.ngrok-free.app/webhooks/tradingview/alert?secret=xxx`
+5. ✅ Full URL: `https://xxx.ngrok-free.app/webhooks/tradingview/xxx`
 
 ### URL changes after restart
 

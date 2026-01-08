@@ -78,11 +78,11 @@ if (Test-Path ".env.demo.local") {
 
 if ($secret) {
     Write-Host "📋 TradingView Webhook URL:" -ForegroundColor Cyan
-    Write-Host "$url/webhooks/tradingview/alert?secret=$secret" -ForegroundColor White
+    Write-Host "$url/webhooks/tradingview/$secret" -ForegroundColor White
     Write-Host ""
 } else {
     Write-Host "📋 TradingView Webhook URL:" -ForegroundColor Cyan
-    Write-Host "$url/webhooks/tradingview/alert?secret=YOUR-WEBHOOK-SECRET" -ForegroundColor White
+    Write-Host "$url/webhooks/tradingview/YOUR-WEBHOOK-SECRET" -ForegroundColor White
     Write-Host ""
     Write-Host "⚠️  Set TRADINGVIEW_WEBHOOK_SECRET in your .env file" -ForegroundColor Yellow
     Write-Host ""

@@ -149,7 +149,7 @@ openssl rand -hex 32
 
 Configure in TradingView alert URL:
 ```
-https://your-domain.com/webhooks/tradingview/alert?secret=your-secret-here
+https://your-domain.com/webhooks/tradingview/your-secret-here
 ```
 
 **For local/Docker deployment:** Use ngrok to expose your API. See [ngrok Docker Guide](./ngrok-docker-guide.md).

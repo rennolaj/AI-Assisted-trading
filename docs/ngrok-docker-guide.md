@@ -65,7 +65,7 @@ Example output: `https://abc123.ngrok-free.app`
 
 In TradingView alert:
 ```
-Webhook URL: https://abc123.ngrok-free.app/webhooks/tradingview/alert?secret=your-webhook-secret
+Webhook URL: https://abc123.ngrok-free.app/webhooks/tradingview/your-webhook-secret
 ```
 
 ### Option 2: ngrok on Host Machine
@@ -255,7 +255,7 @@ docker compose --env-file .env.demo.local --profile ngrok up -d ngrok
 2. ✅ Is API running? `docker compose ps api`
 3. ✅ Is URL correct? Check http://localhost:4040
 4. ✅ Is secret correct? `grep TRADINGVIEW_WEBHOOK_SECRET .env.demo.local`
-5. ✅ Full URL format: `https://abc123.ngrok-free.app/webhooks/tradingview/alert?secret=your-secret`
+5. ✅ Full URL format: `https://abc123.ngrok-free.app/webhooks/tradingview/your-secret`
 
 ### ngrok URL Changes After Restart
 
@@ -346,10 +346,10 @@ curl -s http://localhost:4040/api/tunnels | \
 1. Open TradingView
 2. Create or edit alert
 3. Set webhook URL to:
-   https://YOUR-NGROK-URL/webhooks/tradingview/alert?secret=YOUR-WEBHOOK-SECRET
+   https://YOUR-NGROK-URL/webhooks/tradingview/YOUR-WEBHOOK-SECRET
    
    Example:
-   https://abc123.ngrok-free.app/webhooks/tradingview/alert?secret=a1b2c3d4e5f6...
+   https://abc123.ngrok-free.app/webhooks/tradingview/a1b2c3d4e5f6...
 
 4. Test by triggering alert
 5. Check logs: docker compose logs -f api worker

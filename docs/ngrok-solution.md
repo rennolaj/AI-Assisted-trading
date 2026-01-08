@@ -85,7 +85,7 @@ docker compose --env-file .env.demo.local --profile ngrok up -d
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 
 # 📋 TradingView Webhook URL:
-# https://abc123.ngrok-free.app/webhooks/tradingview/alert?secret=your-secret
+# https://abc123.ngrok-free.app/webhooks/tradingview/your-secret
 ```
 
 ### Step 5: Configure TradingView

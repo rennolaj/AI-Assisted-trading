@@ -66,11 +66,11 @@ fi
 
 if [ -n "$SECRET" ]; then
     echo "📋 TradingView Webhook URL:"
-    echo "$URL/webhooks/tradingview/alert?secret=$SECRET"
+    echo "$URL/webhooks/tradingview/$SECRET"
     echo ""
 else
     echo "📋 TradingView Webhook URL:"
-    echo "$URL/webhooks/tradingview/alert?secret=YOUR-WEBHOOK-SECRET"
+    echo "$URL/webhooks/tradingview/YOUR-WEBHOOK-SECRET"
     echo ""
     echo "⚠️  Set TRADINGVIEW_WEBHOOK_SECRET in your .env file"
     echo ""
