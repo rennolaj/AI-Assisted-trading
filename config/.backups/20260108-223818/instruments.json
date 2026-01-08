@@ -1,0 +1,22 @@
+{
+  "instruments": [
+    {
+      "symbol": "BTCUSD.P",
+      "priceTick": 0.5,
+      "qtyStep": 1,
+      "minQty": 1,
+      "minNotional": 10,
+      "maxLeverage": 5,
+      "contractMultiplier": 1
+    },
+    {
+      "symbol": "ETHUSD.P",
+      "priceTick": 0.05,
+      "qtyStep": 1,
+      "minQty": 1,
+      "minNotional": 10,
+      "maxLeverage": 5,
+      "contractMultiplier": 1
+    }
+  ]
+}
