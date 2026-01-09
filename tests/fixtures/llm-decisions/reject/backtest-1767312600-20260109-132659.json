@@ -1,0 +1,409 @@
+{
+  "metadata": {
+    "captureDate": "2026-01-09T12:27:00Z",
+    "idempotencyKey": "backtest-1767312600",
+    "alertId": "b86cb56b-779d-4a12-a111-21970b8679c2",
+    "llmProvider": "local",
+    "llmModel": "openai/gpt-oss-20b",
+    "promptVersion": "1.0",
+    "schemaVersion": "1.0.0",
+    "description": "Captured from alert backtest-1767312600",
+    "scenario": "Auto-captured scenario",
+    "expectedDecision": "ALLOWLONGW3",
+    "processingStatus": "plan_failed",
+    "category": "reject"
+  },
+  "input": {
+    "alertPayload": {
+      "idempotencyKey": "backtest-1767312600",
+      "ticker": "BTC/USD",
+      "exchange": "KRAKEN",
+      "interval": "1m",
+      "close": 116435.06,
+      "volume": 1286.39,
+      "directionHint": "LONG",
+      "symbolHint": "BTCUSD.P",
+      "reason": "Fine scan (timestamp: 1767312600, index: 1450)"
+    },
+    "indicatorSnapshot": {
+      "mode": "scalping_default",
+      "risk": {
+        "action": "ALLOW_IF_POLICY",
+        "category": "MODERATE",
+        "trendRequired": false,
+        "riskMultiplier": 0.5,
+        "minConfirmations": 2,
+        "counterTrendAllowed": true
+      },
+      "gates": {
+        "dataIntegrity": true,
+        "rsiExtremeAnchor": true,
+        "directionDeclared": true
+      },
+      "score": {
+        "score": 60,
+        "maxScore": 100,
+        "scorePercent": 60.0,
+        "confirmations": 3
+      },
+      "symbol": "BTCUSD.P",
+      "alertId": "b86cb56b-779d-4a12-a111-21970b8679c2",
+      "direction": "LONG",
+      "parameters": {
+        "macdFast": 12,
+        "macdSlow": 26,
+        "rsiPeriod": 14,
+        "macdSignal": 9,
+        "volumeRule": {
+          "mode": "SMA_RATIO",
+          "period": 20,
+          "threshold": 1.5
+        },
+        "stochRsiPeriod": 14
+      },
+      "timeframes": [
+        {
+          "tf": "M5",
+          "rsi": {
+            "state": "NEUTRAL",
+            "value": 38.386642
+          },
+          "macd": {
+            "hist": 76.045119,
+            "macd": -704.395743,
+            "state": "BULLISH",
+            "signal": -780.440863
+          },
+          "volume": {
+            "rule": "SMA_RATIO:20:1.5",
+            "state": "WEAK",
+            "value": 0.948007
+          },
+          "stochRsi": {
+            "d": 62.695206,
+            "k": 51.214889,
+            "state": "NEUTRAL"
+          }
+        },
+        {
+          "tf": "M15",
+          "rsi": {
+            "state": "NEUTRAL",
+            "value": 50.736005
+          },
+          "macd": {
+            "hist": 15.682268,
+            "macd": 44.168275,
+            "state": "BULLISH",
+            "signal": 28.486007
+          },
+          "volume": {
+            "rule": "SMA_RATIO:20:1.5",
+            "state": "WEAK",
+            "value": 0.060145
+          },
+          "stochRsi": {
+            "d": 68.555763,
+            "k": 58.324187,
+            "state": "NEUTRAL"
+          }
+        },
+        {
+          "tf": "M30",
+          "rsi": {
+            "state": "OVERSOLD",
+            "value": 19.895494
+          },
+          "macd": {
+            "hist": 785.600782,
+            "macd": -9357.364553,
+            "state": "BULLISH",
+            "signal": -10142.965334
+          },
+          "volume": {
+            "rule": "SMA_RATIO:20:1.5",
+            "state": "WEAK",
+            "value": 1.008273
+          },
+          "stochRsi": {
+            "d": 29.184523,
+            "k": 30.642644,
+            "state": "NEUTRAL"
+          }
+        },
+        {
+          "tf": "H1",
+          "rsi": {
+            "state": "OVERSOLD",
+            "value": 22.369291
+          },
+          "macd": {
+            "hist": -3731.292752,
+            "macd": -8447.821109,
+            "state": "BEARISH",
+            "signal": -4716.528356
+          },
+          "volume": {
+            "rule": "SMA_RATIO:20:1.5",
+            "state": "WEAK",
+            "value": 0.988490
+          },
+          "stochRsi": {
+            "d": 0,
+            "k": 0,
+            "state": "OVERSOLD"
+          }
+        },
+        {
+          "tf": "H2",
+          "rsi": {
+            "state": "NEUTRAL",
+            "value": 33.916813
+          },
+          "macd": {
+            "hist": -10324.511794,
+            "macd": 3250.380082,
+            "state": "BEARISH",
+            "signal": 13574.891876
+          },
+          "volume": {
+            "rule": "SMA_RATIO:20:1.5",
+            "state": "WEAK",
+            "value": 1.031185
+          },
+          "stochRsi": {
+            "d": 0,
+            "k": 0,
+            "state": "OVERSOLD"
+          }
+        }
+      ],
+      "computedAtUtc": "2026-01-09T12:26:15.0841698+00:00",
+      "confirmations": {
+        "rsiMultiTf": true,
+        "macdMomentum": true,
+        "volumeConfirm": false,
+        "trendAlignment": true,
+        "stochRsiReversal": false,
+        "counterTrendVolumeOk": true
+      },
+      "correlationId": "3d05d04e-2b20-48fc-9398-3511538f2ee6",
+      "trendTimeframe": "H2",
+      "anchorTimeframe": "M30",
+      "evaluationTimeUtc": "2026-01-09T12:26:15.0841698+00:00"
+    },
+    "elliottCandidates": {
+      "candidates": [
+        {
+          "score": 45,
+          "waveLabel": "W3",
+          "confidence": 0.45,
+          "candidateId": "2eae762aa9476a46",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": 96130.85
+          },
+          "ruleViolations": []
+        },
+        {
+          "score": 0,
+          "waveLabel": "OTHER",
+          "confidence": 0,
+          "candidateId": "3084148c9d616c36",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": null
+          },
+          "ruleViolations": [
+            {
+              "rule": "EW_IMP_R2_W3_NOT_SHORTEST",
+              "details": "Wave 3 is the shortest among waves 1, 3, and 5.",
+              "severity": "ERROR"
+            },
+            {
+              "rule": "EW_IMP_R3_W4_NO_OVERLAP_W1",
+              "details": "Wave 4 overlapped wave 1 territory.",
+              "severity": "ERROR"
+            }
+          ]
+        },
+        {
+          "score": 22,
+          "waveLabel": "W3",
+          "confidence": 0.22,
+          "candidateId": "58f91d02d317e079",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": 92153.28,
+            "shortInvalidationPrice": null
+          },
+          "ruleViolations": [
+            {
+              "rule": "EW_IMP_R1_W2_NOT_BEYOND_W1_START",
+              "details": "Wave 2 retraced below wave 1 start.",
+              "severity": "ERROR"
+            }
+          ]
+        },
+        {
+          "score": 5,
+          "waveLabel": "OTHER",
+          "confidence": 0.05,
+          "candidateId": "129ec0cc127a0f75",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": null
+          },
+          "ruleViolations": [
+            {
+              "rule": "EW_IMP_R1_W2_NOT_BEYOND_W1_START",
+              "details": "Wave 2 retraced below wave 1 start.",
+              "severity": "ERROR"
+            },
+            {
+              "rule": "EW_IMP_R3_W4_NO_OVERLAP_W1",
+              "details": "Wave 4 overlapped wave 1 territory.",
+              "severity": "ERROR"
+            }
+          ]
+        },
+        {
+          "score": 22,
+          "waveLabel": "W3",
+          "confidence": 0.22,
+          "candidateId": "7d100d5bb65eeb6b",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": 96175.98
+          },
+          "ruleViolations": [
+            {
+              "rule": "EW_IMP_R1_W2_NOT_BEYOND_W1_START",
+              "details": "Wave 2 retraced above wave 1 start.",
+              "severity": "ERROR"
+            }
+          ]
+        },
+        {
+          "score": 22,
+          "waveLabel": "OTHER",
+          "confidence": 0.22,
+          "candidateId": "a25770ed23325c2b",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": null
+          },
+          "ruleViolations": [
+            {
+              "rule": "EW_IMP_R1_W2_NOT_BEYOND_W1_START",
+              "details": "Wave 2 retraced above wave 1 start.",
+              "severity": "ERROR"
+            }
+          ]
+        },
+        {
+          "score": 10,
+          "waveLabel": "OTHER",
+          "confidence": 0.1,
+          "candidateId": "ef3a83e4d3da85be",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": null
+          },
+          "ruleViolations": [
+            {
+              "rule": "EW_IMP_R1_W2_NOT_BEYOND_W1_START",
+              "details": "Wave 2 retraced below wave 1 start.",
+              "severity": "ERROR"
+            }
+          ]
+        },
+        {
+          "score": 0,
+          "waveLabel": "OTHER",
+          "confidence": 0,
+          "candidateId": "c0ef86230b51e91b",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": null
+          },
+          "ruleViolations": [
+            {
+              "rule": "EW_IMP_R1_W2_NOT_BEYOND_W1_START",
+              "details": "Wave 2 retraced below wave 1 start.",
+              "severity": "ERROR"
+            },
+            {
+              "rule": "EW_IMP_R2_W3_NOT_SHORTEST",
+              "details": "Wave 3 is the shortest among waves 1, 3, and 5.",
+              "severity": "ERROR"
+            },
+            {
+              "rule": "EW_IMP_R3_W4_NO_OVERLAP_W1",
+              "details": "Wave 4 overlapped wave 1 territory.",
+              "severity": "ERROR"
+            }
+          ]
+        },
+        {
+          "score": 45,
+          "waveLabel": "W3",
+          "confidence": 0.45,
+          "candidateId": "17a839a951287430",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": null,
+            "shortInvalidationPrice": 89775.73
+          },
+          "ruleViolations": []
+        },
+        {
+          "score": 45,
+          "waveLabel": "W5END",
+          "confidence": 0.45,
+          "candidateId": "7437a4ab5a1e3ce1",
+          "patternType": "IMPULSE",
+          "invalidation": {
+            "longInvalidationPrice": 80353.76,
+            "shortInvalidationPrice": null
+          },
+          "ruleViolations": []
+        }
+      ],
+      "baseTimeframe": "M1"
+    }
+  },
+  "output": {
+    "decision": "ALLOWLONGW3",
+    "status": "plan_failed",
+    "errorMessage": "Candidateinvalidationpricewasmissing."
+  },
+  "validation": {
+    "captured": true,
+    "dataComplete": true,
+    "needsReview": true
+  },
+  "llmAdjudication": {
+    "promptText": "You are an adjudication engine. Use the inputs below to decide whether to accept or reject a trade.\n\nRules:\n- Output must be valid JSON matching the LlmDecision schema.\n- Do not include prose outside JSON.\n- If inputs are insufficient or inconsistent, return REJECT with notes.\n- Prefer deterministic decisions using the candidate data below.\n- If a candidate has no ERROR rule violations and includes a valid WAVEINVALIDATION price for the requested direction, prefer ALLOW with that candidate.\n- Otherwise, return REJECT and include a short notes string explaining why.\n\nInputs:\n{\"direction\":\"LONG\",\"snapshot\":{\"symbol\":\"BTCUSD.P\",\"computedAtUtc\":\"2026-01-09T12:26:15.0841698+00:00\",\"timeframes\":[{\"tf\":1,\"rsi\":{\"value\":38.386642,\"state\":\"NEUTRAL\"},\"stochRsi\":{\"k\":51.214889,\"d\":62.695206,\"state\":\"NEUTRAL\"},\"macd\":{\"macd\":-704.395743,\"signal\":-780.440863,\"hist\":76.045119,\"state\":\"BULLISH\"},\"volume\":{\"value\":0.948007,\"state\":\"WEAK\",\"rule\":\"SMA_RATIO:20:1.5\"}},{\"tf\":2,\"rsi\":{\"value\":50.736005,\"state\":\"NEUTRAL\"},\"stochRsi\":{\"k\":58.324187,\"d\":68.555763,\"state\":\"NEUTRAL\"},\"macd\":{\"macd\":44.168275,\"signal\":28.486007,\"hist\":15.682268,\"state\":\"BULLISH\"},\"volume\":{\"value\":0.060145,\"state\":\"WEAK\",\"rule\":\"SMA_RATIO:20:1.5\"}},{\"tf\":3,\"rsi\":{\"value\":19.895494,\"state\":\"OVERSOLD\"},\"stochRsi\":{\"k\":30.642644,\"d\":29.184523,\"state\":\"NEUTRAL\"},\"macd\":{\"macd\":-9357.364553,\"signal\":-10142.965334,\"hist\":785.600782,\"state\":\"BULLISH\"},\"volume\":{\"value\":1.008273,\"state\":\"WEAK\",\"rule\":\"SMA_RATIO:20:1.5\"}},{\"tf\":4,\"rsi\":{\"value\":22.369291,\"state\":\"OVERSOLD\"},\"stochRsi\":{\"k\":0,\"d\":0,\"state\":\"OVERSOLD\"},\"macd\":{\"macd\":-8447.821109,\"signal\":-4716.528356,\"hist\":-3731.292752,\"state\":\"BEARISH\"},\"volume\":{\"value\":0.988490,\"state\":\"WEAK\",\"rule\":\"SMA_RATIO:20:1.5\"}},{\"tf\":5,\"rsi\":{\"value\":33.916813,\"state\":\"NEUTRAL\"},\"stochRsi\":{\"k\":0,\"d\":0,\"state\":\"OVERSOLD\"},\"macd\":{\"macd\":3250.380082,\"signal\":13574.891876,\"hist\":-10324.511794,\"state\":\"BEARISH\"},\"volume\":{\"value\":1.031185,\"state\":\"WEAK\",\"rule\":\"SMA_RATIO:20:1.5\"}}]},\"candidates\":{\"baseTimeframe\":0,\"candidates\":[{\"candidateId\":\"2eae762aa9476a46\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"W3\",\"score\":45,\"confidence\":0.45,\"ruleViolations\":[],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":96130.85}},{\"candidateId\":\"3084148c9d616c36\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"OTHER\",\"score\":0,\"confidence\":0,\"ruleViolations\":[{\"rule\":\"EW_IMP_R2_W3_NOT_SHORTEST\",\"severity\":\"ERROR\",\"details\":\"Wave 3 is the shortest among waves 1, 3, and 5.\"},{\"rule\":\"EW_IMP_R3_W4_NO_OVERLAP_W1\",\"severity\":\"ERROR\",\"details\":\"Wave 4 overlapped wave 1 territory.\"}],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":null}},{\"candidateId\":\"58f91d02d317e079\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"W3\",\"score\":22,\"confidence\":0.22,\"ruleViolations\":[{\"rule\":\"EW_IMP_R1_W2_NOT_BEYOND_W1_START\",\"severity\":\"ERROR\",\"details\":\"Wave 2 retraced below wave 1 start.\"}],\"invalidation\":{\"longInvalidationPrice\":92153.28,\"shortInvalidationPrice\":null}},{\"candidateId\":\"129ec0cc127a0f75\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"OTHER\",\"score\":5,\"confidence\":0.05,\"ruleViolations\":[{\"rule\":\"EW_IMP_R1_W2_NOT_BEYOND_W1_START\",\"severity\":\"ERROR\",\"details\":\"Wave 2 retraced below wave 1 start.\"},{\"rule\":\"EW_IMP_R3_W4_NO_OVERLAP_W1\",\"severity\":\"ERROR\",\"details\":\"Wave 4 overlapped wave 1 territory.\"}],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":null}},{\"candidateId\":\"7d100d5bb65eeb6b\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"W3\",\"score\":22,\"confidence\":0.22,\"ruleViolations\":[{\"rule\":\"EW_IMP_R1_W2_NOT_BEYOND_W1_START\",\"severity\":\"ERROR\",\"details\":\"Wave 2 retraced above wave 1 start.\"}],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":96175.98}},{\"candidateId\":\"a25770ed23325c2b\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"OTHER\",\"score\":22,\"confidence\":0.22,\"ruleViolations\":[{\"rule\":\"EW_IMP_R1_W2_NOT_BEYOND_W1_START\",\"severity\":\"ERROR\",\"details\":\"Wave 2 retraced above wave 1 start.\"}],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":null}},{\"candidateId\":\"ef3a83e4d3da85be\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"OTHER\",\"score\":10,\"confidence\":0.1,\"ruleViolations\":[{\"rule\":\"EW_IMP_R1_W2_NOT_BEYOND_W1_START\",\"severity\":\"ERROR\",\"details\":\"Wave 2 retraced below wave 1 start.\"}],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":null}},{\"candidateId\":\"c0ef86230b51e91b\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"OTHER\",\"score\":0,\"confidence\":0,\"ruleViolations\":[{\"rule\":\"EW_IMP_R1_W2_NOT_BEYOND_W1_START\",\"severity\":\"ERROR\",\"details\":\"Wave 2 retraced below wave 1 start.\"},{\"rule\":\"EW_IMP_R2_W3_NOT_SHORTEST\",\"severity\":\"ERROR\",\"details\":\"Wave 3 is the shortest among waves 1, 3, and 5.\"},{\"rule\":\"EW_IMP_R3_W4_NO_OVERLAP_W1\",\"severity\":\"ERROR\",\"details\":\"Wave 4 overlapped wave 1 territory.\"}],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":null}},{\"candidateId\":\"17a839a951287430\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"W3\",\"score\":45,\"confidence\":0.45,\"ruleViolations\":[],\"invalidation\":{\"longInvalidationPrice\":null,\"shortInvalidationPrice\":89775.73}},{\"candidateId\":\"7437a4ab5a1e3ce1\",\"patternType\":\"IMPULSE\",\"waveLabel\":\"W5END\",\"score\":45,\"confidence\":0.45,\"ruleViolations\":[],\"invalidation\":{\"longInvalidationPrice\":80353.76,\"shortInvalidationPrice\":null}}]},\"policy\":{\"maxAccountRiskPctPerTrade\":1.0,\"maxDailyLossPct\":5.0,\"maxLeverage\":5.0,\"maxNotional\":500000,\"allowedSides\":\"LONG,SHORT\"}}\n",
+    "rawResponse": "{\"decision\":\"ALLOWLONGW3\",\"confidence\":0.45,\"chosenCandidateId\":\"2eae762aa9476a46\",\"stopLossAnchor\":\"WAVEINVALIDATION\",\"notes\":\"Candidate 2eae762aa9476a46 is a valid W3 impulse pattern with no rule violations and acceptable risk parameters for a LONG trade.\"}",
+    "decision": "ALLOWLONGW3",
+    "reasoning": "Candidate 2eae762aa9476a46 is a valid W3 impulse pattern with no rule violations and acceptable risk parameters for a LONG trade.",
+    "confidence": 0.45,
+    "provider": "local",
+    "model": "gpt-4.1-mini",
+    "responseTimeMs": 7402,
+    "promptTokens": null,
+    "completionTokens": null,
+    "totalTokens": null,
+    "parseError": null,
+    "validationErrors": null,
+    "adjudicatedAt": "2026-01-09T12:26:22.496227+00:00"
+  }
+}

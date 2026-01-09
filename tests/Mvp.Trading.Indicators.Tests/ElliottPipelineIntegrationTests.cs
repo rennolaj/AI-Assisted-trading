@@ -118,6 +118,7 @@ public sealed class ElliottPipelineIntegrationTests
         var mcpConfigStore = new StubMcpConfigStore();
         var tradePlanBuilder = new StubTradePlanBuilder();
         var executionService = new StubExecutionService();
+        var llmAdjudicationStore = new StubLlmAdjudicationStore();
         var mcpOptions = Options.Create(new McpProviderOptions());
         var killSwitchService = new StubKillSwitchService();
         var metricsService = new StubMetricsService();
@@ -136,6 +137,7 @@ public sealed class ElliottPipelineIntegrationTests
             mcpConfigStore,
             tradePlanBuilder,
             executionService,
+            llmAdjudicationStore,
             mcpOptions,
             killSwitchService,
             metricsService,
@@ -402,11 +404,20 @@ delete from idempotency_keys where idempotency_key = @key;";
 
     private sealed class StubMcpGateway : IMcpGateway
     {
-        public Task<Result<LlmDecision>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
+        public Task<Result<McpAdjudicationResult>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
         {
             var candidateId = input.Candidates.Candidates.FirstOrDefault()?.CandidateId;
             var decision = new LlmDecision("ALLOWLONGW3", 0.9m, candidateId, "WAVEINVALIDATION", "stub");
-            return Task.FromResult(new Result<LlmDecision>(true, decision, null));
+            var result = new McpAdjudicationResult
+            {
+                PromptSent = "[TEST STUB]",
+                RawResponse = "[TEST STUB]",
+                Decision = decision,
+                Provider = "stub",
+                Model = "test",
+                DurationMs = 0
+            };
+            return Task.FromResult(new Result<McpAdjudicationResult>(true, result, null));
         }
 
         public Task<Result<StopLossSuggestion>> ExplainStopLossAsync(StopLossExplainInput input, CancellationToken ct)
@@ -531,5 +542,18 @@ delete from idempotency_keys where idempotency_key = @key;";
         public void SetActiveTradesGauge(int count) { }
         public void SetQueueDepthGauge(int count) { }
         public void SetReconciliationDiscrepanciesGauge(int count) { }
+    }
+
+    private sealed class StubLlmAdjudicationStore : ILlmAdjudicationStore
+    {
+        public Task SaveAsync(Mvp.Trading.Contracts.Contracts.LlmAdjudication adjudication, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<Mvp.Trading.Contracts.Contracts.LlmAdjudication?> GetByAlertIdAsync(Guid alertId, CancellationToken ct)
+        {
+            return Task.FromResult<Mvp.Trading.Contracts.Contracts.LlmAdjudication?>(null);
+        }
     }
 }

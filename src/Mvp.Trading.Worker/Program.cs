@@ -142,6 +142,7 @@ public static class Program
         builder.Services.AddSingleton<IExecutionIntentStore, PostgresExecutionIntentStore>();
         builder.Services.AddSingleton<IOrderReceiptStore, PostgresOrderReceiptStore>();
         builder.Services.AddSingleton<IExecutionHeartbeatStore, PostgresExecutionHeartbeatStore>();
+        builder.Services.AddSingleton<ILlmAdjudicationStore, PostgresLlmAdjudicationStore>();
         builder.Services.AddSingleton<IExecutionService, ExecutionService>();
 
         // Reconciliation services

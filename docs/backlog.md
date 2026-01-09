@@ -153,8 +153,18 @@
   - Document expected behavior for each alert type through entire pipeline
   - Define acceptance criteria for "correct" vs "incorrect" pipeline behavior
   - See: `docs/alert-dataflow-overview.md` for existing partial documentation
-**Done when**: test suite includes 10+ positive LLM acceptance cases; fixtures serve as regression suite; tooling exists to capture and review new fixtures; complete alert scenario matrix documented; full dataflow validated for logical consistency
-**Status**: Infrastructure complete, scenario framework built, need dataflow validation and comprehensive fixture matrix
+- Story M9.7: LLM adjudication persistence and observability (NEW - CRITICAL)
+  - Add `llm_adjudications` table to database schema to persist full LLM interactions
+  - Store: prompt text, raw response, parsed decision, reasoning, token counts, response time
+  - Track: LLM provider, model, parse errors, validation errors for debugging
+  - Update `AlertWorker` to persist LLM adjudication results after each call
+  - Update `McpGatewayRouter` to return full context (prompt sent, raw response, timing, tokens)
+  - Update `capture-llm-decision.sh` to include LLM adjudication data in fixtures
+  - Add fixture JSON schema section for `llmAdjudication` with full prompt/response/reasoning
+  - Enable debugging of LLM rejections by seeing exact prompt and response
+  - See: `docs/m9-llm-persistence-design.md` for complete design
+**Done when**: test suite includes 10+ positive LLM acceptance cases; fixtures serve as regression suite; tooling exists to capture and review new fixtures; complete alert scenario matrix documented; full dataflow validated for logical consistency; LLM interactions fully observable in database
+**Status**: Infrastructure complete, scenario framework built, dataflow analysis complete (M9.6 ✅), need LLM persistence (M9.7) and comprehensive fixture matrix
 
 ## Implementation Order (Suggested)
 - M0, M1, M2, M3, M4, M5, M6, M7, M8, M9

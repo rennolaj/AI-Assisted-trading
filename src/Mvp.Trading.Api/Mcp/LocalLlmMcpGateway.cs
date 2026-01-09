@@ -41,14 +41,14 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
         _schemaValidator = schemaValidator;
     }
 
-    public async Task<Result<LlmDecision>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
+    public async Task<Result<McpAdjudicationResult>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
     {
         var policy = _policyStore.GetRiskPolicy();
-        var normalizedInput = new ElliottAdjudicationInput(input.Snapshot, input.Candidates, policy);
+        var normalizedInput = new ElliottAdjudicationInput(input.Direction, input.Snapshot, input.Candidates, policy);
         var inputJson = JsonSerializer.Serialize(normalizedInput, InputJsonOptions);
         var prompt = _promptStore.RenderAdjudicateElliottPrompt(inputJson);
 
-        return await InvokeAsync(
+        return await InvokeWithContextAsync(
             AdjudicateTool,
             prompt,
             LlmDecisionSchemaFile,
@@ -71,6 +71,117 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
             schemaVersion: _configStore.GetConfig().SchemaVersions.StopLossSuggestion,
             payload => JsonSerializer.Deserialize<StopLossSuggestion>(payload, OutputJsonOptions),
             ct);
+    }
+
+    private async Task<Result<McpAdjudicationResult>> InvokeWithContextAsync(
+        string toolName,
+        string prompt,
+        string schemaFileName,
+        string schemaVersion,
+        Func<string, LlmDecision?> deserialize,
+        CancellationToken ct)
+    {
+        var startTime = DateTimeOffset.UtcNow;
+        string? rawResponse = null;
+        string? parseError = null;
+        string? validationErrors = null;
+        LlmDecision? decision = null;
+
+        try
+        {
+            var toolConfig = _configStore.GetToolConfig(toolName);
+            if (toolConfig is null)
+            {
+                return Fail<McpAdjudicationResult>("MCP_TOOL_CONFIG_MISSING", $"Tool configuration '{toolName}' was not found.");
+            }
+
+            var schemaName = SanitizeSchemaName($"{toolName}-v{schemaVersion}");
+            var response = await _client.CreateResponseAsync(new OpenAiResponsesRequest(
+                toolConfig.Model,
+                prompt,
+                toolConfig.Temperature,
+                toolConfig.MaxOutputTokens,
+                schemaName,
+                schemaFileName), ct);
+
+            var durationMs = (int)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
+
+            rawResponse = response.Value ?? string.Empty;
+
+            if (!response.Ok || string.IsNullOrWhiteSpace(response.Value))
+            {
+                parseError = response.Error?.Message ?? "Upstream MCP response failed.";
+                decision = new LlmDecision("REJECT", 0, null, "NONE", parseError);
+                
+                return new Result<McpAdjudicationResult>(true, new McpAdjudicationResult
+                {
+                    PromptSent = prompt,
+                    RawResponse = rawResponse,
+                    Decision = decision,
+                    Provider = "local",
+                    Model = toolConfig.Model,
+                    DurationMs = durationMs,
+                    ParseError = parseError
+                }, null);
+            }
+
+            var validation = _schemaValidator.Validate(schemaFileName, response.Value);
+            if (!validation.Ok)
+            {
+                validationErrors = JsonSerializer.Serialize(new { error = validation.Error?.Message ?? "Schema validation failed" });
+                decision = new LlmDecision("REJECT", 0, null, "NONE", validation.Error?.Message ?? "Schema validation failed");
+                
+                return new Result<McpAdjudicationResult>(true, new McpAdjudicationResult
+                {
+                    PromptSent = prompt,
+                    RawResponse = rawResponse,
+                    Decision = decision,
+                    Provider = "local",
+                    Model = toolConfig.Model,
+                    DurationMs = durationMs,
+                    ValidationErrors = validationErrors
+                }, null);
+            }
+
+            decision = deserialize(response.Value);
+            if (decision is null)
+            {
+                parseError = "Failed to deserialize LLM payload.";
+                decision = new LlmDecision("REJECT", 0, null, "NONE", parseError);
+            }
+
+            return new Result<McpAdjudicationResult>(true, new McpAdjudicationResult
+            {
+                PromptSent = prompt,
+                RawResponse = rawResponse,
+                Decision = decision,
+                Provider = "local",
+                Model = toolConfig.Model,
+                DurationMs = durationMs,
+                ParseError = parseError,
+                ValidationErrors = validationErrors
+            }, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var durationMs = (int)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
+            parseError = ex.Message;
+            decision = new LlmDecision("REJECT", 0, null, "NONE", $"Gateway error: {ex.Message}");
+            
+            return new Result<McpAdjudicationResult>(true, new McpAdjudicationResult
+            {
+                PromptSent = prompt,
+                RawResponse = rawResponse ?? string.Empty,
+                Decision = decision,
+                Provider = "local",
+                DurationMs = durationMs,
+                ParseError = parseError
+            }, null);
+        }
     }
 
     private async Task<Result<T>> InvokeAsync<T>(

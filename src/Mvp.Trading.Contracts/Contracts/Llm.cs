@@ -17,6 +17,7 @@ public sealed record LlmDecision(
 /// Input payload for LLM Elliott adjudication.
 /// </summary>
 public sealed record ElliottAdjudicationInput(
+    string Direction,
     SignalSnapshot Snapshot,
     ElliottCandidates Candidates,
     RiskPolicy Policy

@@ -25,7 +25,7 @@ public sealed class McpGatewayRouter : IMcpGateway
         _logger = logger;
     }
 
-    public Task<Result<LlmDecision>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
+    public Task<Result<McpAdjudicationResult>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
     {
         return ExecuteAsync(gateway => gateway.AdjudicateElliottAsync(input, ct), ct);
     }

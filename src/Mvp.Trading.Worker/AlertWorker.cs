@@ -37,6 +37,7 @@ public sealed class AlertWorker : BackgroundService
     private readonly IMcpConfigStore _mcpConfigStore;
     private readonly ITradePlanBuilder _tradePlanBuilder;
     private readonly IExecutionService _executionService;
+    private readonly ILlmAdjudicationStore _llmAdjudicationStore;
     private readonly McpProviderOptions _mcpOptions;
     private readonly IKillSwitchService _killSwitchService;
     private readonly IMetricsService _metricsService;
@@ -55,6 +56,7 @@ public sealed class AlertWorker : BackgroundService
         IMcpConfigStore mcpConfigStore,
         ITradePlanBuilder tradePlanBuilder,
         IExecutionService executionService,
+        ILlmAdjudicationStore llmAdjudicationStore,
         IOptions<McpProviderOptions> mcpOptions,
         IKillSwitchService killSwitchService,
         IMetricsService metricsService,
@@ -74,6 +76,7 @@ public sealed class AlertWorker : BackgroundService
         _mcpConfigStore = mcpConfigStore;
         _tradePlanBuilder = tradePlanBuilder;
         _executionService = executionService;
+        _llmAdjudicationStore = llmAdjudicationStore;
         _mcpOptions = mcpOptions.Value;
         _killSwitchService = killSwitchService;
         _metricsService = metricsService;
@@ -204,11 +207,13 @@ public sealed class AlertWorker : BackgroundService
                             stoppingToken);
 
                         var adjudicationInput = new ElliottAdjudicationInput(
+                            alert.Intent.DirectionHint,
                             ToSignalSnapshot(snapshotResult.Value),
                             elliottCandidates,
                             _policyStore.GetRiskPolicy());
 
-                        var adjudication = await GetAdjudicationAsync(adjudicationInput, alert, stoppingToken);
+                        var correlationId = Guid.NewGuid();
+                        var adjudication = await GetAdjudicationAsync(adjudicationInput, alert, correlationId, stoppingToken);
                         if (!adjudication.Ok || adjudication.Value is null)
                         {
                             var errorCode = adjudication.Error?.Code ?? "MCP_ADJUDICATION_FAILED";
@@ -222,17 +227,18 @@ public sealed class AlertWorker : BackgroundService
                             continue;
                         }
 
-                        if (!IsAllowDecision(adjudication.Value.Decision))
+                        var llmDecision = adjudication.Value.Decision;
+                        if (!IsAllowDecision(llmDecision.Decision))
                         {
                             await _processingStore.UpsertAsync(
                                 alert,
                                 "rejected",
-                                $"LLM_DECISION:{adjudication.Value.Decision}",
+                                $"LLM_DECISION:{llmDecision.Decision}",
                                 stoppingToken);
                             _logger.LogInformation(
                                 "Alert {AlertId} rejected by MCP with decision {Decision}.",
                                 alert.AlertId,
-                                adjudication.Value.Decision);
+                                llmDecision.Decision);
                             
                             stopwatch.Stop();
                             _metricsService.RecordAlertProcessed("rejected_llm");
@@ -244,7 +250,7 @@ public sealed class AlertWorker : BackgroundService
                             alert,
                             ToSignalSnapshot(snapshotResult.Value),
                             elliottCandidates,
-                            adjudication.Value,
+                            llmDecision,
                             _policyStore.GetRiskPolicy(),
                             "1.0",
                             _mcpConfigStore.GetConfig().SchemaVersions.LlmDecision,
@@ -362,9 +368,10 @@ public sealed class AlertWorker : BackgroundService
                 string.Equals(violation.Rule, ElliottRuleCodes.PivotsInsufficient, StringComparison.Ordinal)));
     }
 
-    private async Task<Result<LlmDecision>> GetAdjudicationAsync(
+    private async Task<Result<McpAdjudicationResult>> GetAdjudicationAsync(
         ElliottAdjudicationInput adjudicationInput,
         AlertEvent alert,
+        Guid correlationId,
         CancellationToken ct)
     {
         if (_mcpOptions.ForceAllow)
@@ -373,13 +380,60 @@ public sealed class AlertWorker : BackgroundService
             if (forced is not null)
             {
                 _logger.LogWarning("MCP force-allow enabled; bypassing LLM adjudication.");
-                return new Result<LlmDecision>(true, forced, null);
+                // Create a synthetic adjudication result for forced decisions
+                var forcedResult = new McpAdjudicationResult
+                {
+                    PromptSent = "[FORCED DECISION - NO LLM CALL]",
+                    RawResponse = "[FORCED DECISION - NO LLM CALL]",
+                    Decision = forced,
+                    Provider = "forced",
+                    Model = null,
+                    DurationMs = 0
+                };
+                return new Result<McpAdjudicationResult>(true, forcedResult, null);
             }
 
             _logger.LogWarning("MCP force-allow enabled but no eligible candidate found; falling back to LLM.");
         }
 
-        return await _mcpGateway.AdjudicateElliottAsync(adjudicationInput, ct);
+        var llmResult = await _mcpGateway.AdjudicateElliottAsync(adjudicationInput, ct);
+        
+        // Persist LLM adjudication to database
+        if (llmResult.Ok && llmResult.Value is not null)
+        {
+            var adjudication = new Mvp.Trading.Contracts.Contracts.LlmAdjudication
+            {
+                AdjudicationId = Guid.NewGuid(),
+                AlertId = alert.AlertId,
+                CorrelationId = correlationId,
+                PromptText = llmResult.Value.PromptSent,
+                PromptTokens = llmResult.Value.PromptTokens,
+                RawResponse = llmResult.Value.RawResponse,
+                CompletionTokens = llmResult.Value.CompletionTokens,
+                TotalTokens = llmResult.Value.TotalTokens,
+                Decision = llmResult.Value.Decision.Decision,
+                Reasoning = llmResult.Value.Decision.Notes,
+                Confidence = llmResult.Value.Decision.Confidence,
+                LlmProvider = llmResult.Value.Provider,
+                LlmModel = llmResult.Value.Model,
+                ResponseTimeMs = llmResult.Value.DurationMs,
+                AdjudicatedAtUtc = DateTimeOffset.UtcNow,
+                ParseError = llmResult.Value.ParseError,
+                ValidationErrors = llmResult.Value.ValidationErrors
+            };
+
+            try
+            {
+                await _llmAdjudicationStore.SaveAsync(adjudication, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to persist LLM adjudication for alert {AlertId}", alert.AlertId);
+                // Don't fail the alert processing if persistence fails
+            }
+        }
+        
+        return llmResult;
     }
 
     private static LlmDecision? TryBuildForcedDecision(ElliottAdjudicationInput adjudicationInput, AlertEvent alert)

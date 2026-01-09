@@ -19,7 +19,7 @@ public sealed class OpenAiMcpGatewayTests
         var result = await gateway.AdjudicateElliottAsync(BuildAdjudicationInput(), CancellationToken.None);
 
         Assert.True(result.Ok);
-        Assert.Equal("ALLOWLONGW3", result.Value?.Decision);
+        Assert.Equal("ALLOWLONGW3", result.Value?.Decision.Decision);
     }
 
     [Fact]
@@ -29,8 +29,12 @@ public sealed class OpenAiMcpGatewayTests
 
         var result = await gateway.AdjudicateElliottAsync(BuildAdjudicationInput(), CancellationToken.None);
 
-        Assert.False(result.Ok);
-        Assert.Equal("MCP_OUTPUT_INVALID_JSON", result.Error?.Code);
+        // M9.7: Invalid JSON fails schema validation, returns Ok=true with REJECT decision and ValidationErrors set
+        Assert.True(result.Ok);
+        Assert.NotNull(result.Value);
+        Assert.Equal("REJECT", result.Value.Decision.Decision);
+        Assert.NotNull(result.Value.ValidationErrors);
+        Assert.Equal("not-json", result.Value.RawResponse);
     }
 
     [Fact]
@@ -41,8 +45,12 @@ public sealed class OpenAiMcpGatewayTests
 
         var result = await gateway.AdjudicateElliottAsync(BuildAdjudicationInput(), CancellationToken.None);
 
-        Assert.False(result.Ok);
-        Assert.Equal("MCP_SCHEMA_INVALID", result.Error?.Code);
+        // M9.7: Now returns Ok=true with REJECT decision and ValidationErrors set
+        Assert.True(result.Ok);
+        Assert.NotNull(result.Value);
+        Assert.Equal("REJECT", result.Value.Decision.Decision);
+        Assert.NotNull(result.Value.ValidationErrors);
+        Assert.Equal(responseJson, result.Value.RawResponse);
     }
 
     [Fact]
@@ -111,7 +119,7 @@ public sealed class OpenAiMcpGatewayTests
 
         var policy = new RiskPolicy(1m, 5m, 5m, 50000m, "LONG,SHORT");
 
-        return new ElliottAdjudicationInput(snapshot, candidates, policy);
+        return new ElliottAdjudicationInput("LONG", snapshot, candidates, policy);
     }
 
     private static StopLossExplainInput BuildStopLossInput()

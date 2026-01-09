@@ -165,23 +165,62 @@ INDICATOR_SNAPSHOT=$(docker exec ai-assisted-postgres-1 psql -U postgres -d ai-t
 ELLIOTT_CANDIDATES=$(docker exec ai-assisted-postgres-1 psql -U postgres -d ai-trading-db -t -A -c \
     "SELECT candidates_json FROM elliott_candidates WHERE alert_id = '$ALERT_ID';")
 
+# Get LLM adjudication data (M9.7)
+info "Fetching LLM adjudication data..."
+LLM_ADJUDICATION=$(docker exec ai-assisted-postgres-1 psql -U postgres -d ai-trading-db -t -A -c \
+    "SELECT row_to_json(llm) FROM (
+        SELECT 
+            prompt_text as \"promptText\",
+            raw_response as \"rawResponse\",
+            decision,
+            reasoning,
+            confidence,
+            llm_provider as \"provider\",
+            llm_model as \"model\",
+            response_time_ms as \"responseTimeMs\",
+            prompt_tokens as \"promptTokens\",
+            completion_tokens as \"completionTokens\",
+            total_tokens as \"totalTokens\",
+            parse_error as \"parseError\",
+            validation_errors as \"validationErrors\",
+            adjudicated_at_utc as \"adjudicatedAt\"
+        FROM llm_adjudications 
+        WHERE alert_id = '$ALERT_ID'
+        ORDER BY adjudicated_at_utc DESC 
+        LIMIT 1
+    ) llm;")
+
 # Check if we have all required data
 [[ -z "$RAW_PAYLOAD" || "$RAW_PAYLOAD" == "" ]] && error "Raw payload not found"
 [[ -z "$INDICATOR_SNAPSHOT" || "$INDICATOR_SNAPSHOT" == "" ]] && error "Indicator snapshot not found"
 [[ -z "$ELLIOTT_CANDIDATES" || "$ELLIOTT_CANDIDATES" == "" ]] && error "Elliott candidates not found"
 
+if [[ -z "$LLM_ADJUDICATION" || "$LLM_ADJUDICATION" == "" ]]; then
+    warn "LLM adjudication not found - alert may have been processed before M9.7"
+    LLM_ADJUDICATION="null"
+else
+    info "Successfully fetched LLM adjudication data"
+fi
+
 info "Successfully fetched all data components"
 
-# Extract LLM decision from error message if rejected
+# Extract LLM decision from error message if rejected (fallback for pre-M9.7)
 LLM_DECISION="UNKNOWN"
-if [[ "$ERROR_MSG" == *"LLM_DECISION:"* ]]; then
+if [[ "$LLM_ADJUDICATION" != "null" ]]; then
+    # Extract decision from LLM adjudication data (M9.7+)
+    if command -v jq &> /dev/null; then
+        LLM_DECISION=$(echo "$LLM_ADJUDICATION" | jq -r '.decision // "UNKNOWN"')
+    fi
+elif [[ "$ERROR_MSG" == *"LLM_DECISION:"* ]]; then
+    # Fallback: extract from error message (pre-M9.7)
     LLM_DECISION=$(echo "$ERROR_MSG" | sed 's/.*LLM_DECISION:\([A-Z]*\).*/\1/')
 fi
 
 # Build the fixture JSON
 info "Building fixture JSON..."
 
-cat > "$OUTPUT_PATH" <<EOF
+TEMP_FILE=$(mktemp)
+cat > "$TEMP_FILE" <<EOF
 {
   "metadata": {
     "captureDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
@@ -215,6 +254,14 @@ cat > "$OUTPUT_PATH" <<EOF
 }
 EOF
 
+# Add LLM adjudication data if available (M9.7+)
+if [[ "$LLM_ADJUDICATION" != "null" ]] && command -v jq &> /dev/null; then
+    jq --argjson llm "$LLM_ADJUDICATION" '. + {llmAdjudication: $llm}' "$TEMP_FILE" > "$OUTPUT_PATH"
+    rm "$TEMP_FILE"
+else
+    mv "$TEMP_FILE" "$OUTPUT_PATH"
+fi
+
 info "Fixture saved to: $OUTPUT_PATH"
 
 # Validate JSON syntax
@@ -234,13 +281,18 @@ echo -e "${GREEN}=== Fixture Capture Complete ===${NC}"
 echo "Category:        $CATEGORY"
 echo "Decision:        $LLM_DECISION"
 echo "Status:          $STATUS"
+echo "LLM Data:        $(if [[ "$LLM_ADJUDICATION" != "null" ]]; then echo "✓ Captured"; else echo "✗ Not available"; fi)"
 echo "Output:          $OUTPUT_PATH"
 echo ""
 echo -e "${YELLOW}Next Steps:${NC}"
 echo "1. Review the fixture file and add missing details"
 echo "2. Update 'description' and 'scenario' fields with meaningful text"
 echo "3. If this is an ACCEPT case, verify the LLM reasoning is sound"
-echo "4. Create a corresponding test case in tests/Mvp.Trading.*.Tests/"
+if [[ "$LLM_ADJUDICATION" != "null" ]]; then
+    echo "4. Review LLM prompt and response for debugging: jq '.llmAdjudication' $OUTPUT_PATH"
+    echo "5. Analyze prompt length: jq -r '.llmAdjudication.promptText' $OUTPUT_PATH | wc -c"
+    echo "6. Check for validation errors: jq '.llmAdjudication.validationErrors' $OUTPUT_PATH"
+fi
 echo ""
 
 exit 0
