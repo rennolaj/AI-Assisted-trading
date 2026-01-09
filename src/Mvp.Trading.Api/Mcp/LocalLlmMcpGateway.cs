@@ -107,8 +107,11 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
             var durationMs = (int)(DateTimeOffset.UtcNow - startTime).TotalMilliseconds;
 
             rawResponse = response.Value ?? string.Empty;
+            
+            // Extract JSON from LocalLLM response that may contain special tokens like <|channel|>final <|constrain|>JSON<|message|>{...}
+            var cleanedResponse = ExtractJsonFromResponse(rawResponse);
 
-            if (!response.Ok || string.IsNullOrWhiteSpace(response.Value))
+            if (!response.Ok || string.IsNullOrWhiteSpace(cleanedResponse))
             {
                 parseError = response.Error?.Message ?? "Upstream MCP response failed.";
                 decision = new LlmDecision("REJECT", 0, null, "NONE", parseError);
@@ -125,7 +128,7 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
                 }, null);
             }
 
-            var validation = _schemaValidator.Validate(schemaFileName, response.Value);
+            var validation = _schemaValidator.Validate(schemaFileName, cleanedResponse);
             if (!validation.Ok)
             {
                 validationErrors = JsonSerializer.Serialize(new { error = validation.Error?.Message ?? "Schema validation failed" });
@@ -143,7 +146,7 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
                 }, null);
             }
 
-            decision = deserialize(response.Value);
+            decision = deserialize(cleanedResponse);
             if (decision is null)
             {
                 parseError = "Failed to deserialize LLM payload.";
@@ -275,5 +278,25 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
         }
 
         return new string(buffer, 0, length);
+    }
+
+    private static string ExtractJsonFromResponse(string response)
+    {
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            return response;
+        }
+
+        // LocalLLM may add special tokens like: <|channel|>final <|constrain|>JSON<|message|>{actual json}
+        // Find the first { and last } to extract the JSON
+        var firstBrace = response.IndexOf('{');
+        var lastBrace = response.LastIndexOf('}');
+
+        if (firstBrace >= 0 && lastBrace > firstBrace)
+        {
+            return response.Substring(firstBrace, lastBrace - firstBrace + 1);
+        }
+
+        return response;
     }
 }

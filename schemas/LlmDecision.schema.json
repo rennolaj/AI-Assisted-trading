@@ -8,7 +8,7 @@
   "properties": {
     "decision": {
       "type": "string",
-      "enum": ["ALLOWLONGW3", "ALLOWSHORTW5END", "REJECT", "UNCERTAIN"]
+      "enum": ["ALLOWLONGW3", "ALLOWLONGW5END", "ALLOWSHORTW3", "ALLOWSHORTW5END", "REJECT", "UNCERTAIN"]
     },
     "confidence": {
       "type": "number",

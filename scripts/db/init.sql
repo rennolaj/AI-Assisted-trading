@@ -174,6 +174,43 @@ create table if not exists kill_switch_audit (
 
 create index if not exists idx_kill_switch_audit_timestamp on kill_switch_audit(timestamp_utc desc);
 
+-- LLM Adjudications table (M9.7)
+create table if not exists llm_adjudications (
+    adjudication_id uuid primary key default gen_random_uuid(),
+    alert_id uuid not null references alerts(alert_id) on delete cascade,
+    correlation_id uuid not null,
+    
+    -- LLM Request
+    prompt_text text not null,
+    prompt_tokens integer,
+    
+    -- LLM Response
+    raw_response text not null,
+    completion_tokens integer,
+    total_tokens integer,
+    
+    -- Parsed Decision
+    decision varchar(50) not null,
+    reasoning text not null,
+    confidence decimal(5,2),
+    
+    -- Metadata
+    llm_provider varchar(50) not null,
+    llm_model varchar(100),
+    response_time_ms integer,
+    adjudicated_at_utc timestamptz not null default now(),
+    
+    -- Error tracking
+    parse_error text,
+    validation_errors jsonb
+);
+
+create index if not exists idx_llm_adjudications_alert on llm_adjudications(alert_id);
+create index if not exists idx_llm_adjudications_decision on llm_adjudications(decision);
+create index if not exists idx_llm_adjudications_time on llm_adjudications(adjudicated_at_utc desc);
+create index if not exists idx_llm_adjudications_provider on llm_adjudications(llm_provider);
+create index if not exists idx_llm_adjudications_correlation on llm_adjudications(correlation_id);
+
 -- Initialize kill switch as inactive
 insert into system_state (key, value, updated_by)
 values ('kill_switch', '{"active": false, "level": "PAUSE_ALL", "reason": null, "activated_at": null}'::jsonb, 'system')

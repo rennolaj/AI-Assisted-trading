@@ -246,15 +246,18 @@ public sealed class AlertWorker : BackgroundService
                             continue;
                         }
 
+                        // Override risk for W3 patterns - RSI extreme not required for impulse waves
+                        var adjustedSnapshot = AdjustRiskForW3Pattern(snapshotResult.Value, llmDecision.Decision);
+
                         var planContext = new TradePlanContext(
                             alert,
-                            ToSignalSnapshot(snapshotResult.Value),
+                            ToSignalSnapshot(adjustedSnapshot),
                             elliottCandidates,
                             llmDecision,
                             _policyStore.GetRiskPolicy(),
                             "1.0",
                             _mcpConfigStore.GetConfig().SchemaVersions.LlmDecision,
-                            snapshotResult.Value.EvaluationTimeUtc);
+                            adjustedSnapshot.EvaluationTimeUtc);
 
                         var planResult = _tradePlanBuilder.BuildPlan(planContext);
                         if (!planResult.Ok || planResult.Value is null)
@@ -339,6 +342,29 @@ public sealed class AlertWorker : BackgroundService
     private static bool IsAllowDecision(string decision)
     {
         return decision.StartsWith("ALLOW", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IndicatorSnapshot AdjustRiskForW3Pattern(IndicatorSnapshot snapshot, string decision)
+    {
+        // For W3 patterns (impulse waves), override INVALID risk if only RSI gate failed
+        // W3 happens mid-trend, so RSI extremes are not required
+        // W5END patterns still require RSI extremes for reversal confirmation
+        if ((decision == "ALLOWLONGW3" || decision == "ALLOWSHORTW3") && 
+            snapshot.Risk.Category == "INVALID")
+        {
+            // Use LOW risk profile for W3 patterns when RSI gate failed
+            var overrideRisk = new IndicatorRisk(
+                "LOW",
+                "ALLOW_LITE",
+                0.5m, // 50% of normal risk for W3 without RSI confirmation
+                TrendRequired: false,
+                CounterTrendAllowed: true,
+                MinConfirmations: 0);
+
+            return snapshot with { Risk = overrideRisk };
+        }
+
+        return snapshot;
     }
 
     private static SignalSnapshot ToSignalSnapshot(IndicatorSnapshot snapshot)
