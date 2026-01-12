@@ -1,0 +1,25 @@
+timestamp,symbol,direction,close_price,interval,notes
+1736294400,PF_XBTUSD,LONG,90740.0,4h,Large 4h move (1.18%) early Jan 8 - good Elliott setup
+1736308800,PF_XBTUSD,SHORT,90450.0,4h,Large 4h move (1.77%) with rejection - Elliott invalidation test
+1736323200,PF_XBTUSD,LONG,90138.0,4h,Moderate 4h move (1.11%) mid-day
+1736337600,PF_XBTUSD,LONG,90711.0,4h,Large 4h move (1.74%) afternoon surge
+1736294400,PF_XBTUSD,SHORT,91337.0,1h,Moderate 1h move (0.53%) early hours
+1736298000,PF_XBTUSD,SHORT,91364.0,1h,Strong 1h move (0.80%) downtrend
+1736301600,PF_XBTUSD,LONG,90893.0,1h,Moderate 1h move (0.58%) recovery
+1736305200,PF_XBTUSD,LONG,90740.0,1h,Moderate 1h move (0.51%) continuation
+1736308800,PF_XBTUSD,SHORT,90756.0,1h,Very large 1h move (1.14%) major drop
+1736312400,PF_XBTUSD,LONG,89802.0,1h,Very large 1h move (1.06%) strong bounce
+1736316000,PF_XBTUSD,SHORT,90450.0,1h,Large 1h move (0.68%) pullback
+1736294400,PF_XBTUSD,SHORT,91178.0,15m,Moderate 15m move (0.38%) early rejection
+1736296800,PF_XBTUSD,LONG,91337.0,15m,Small 15m move (0.21%) consolidation
+1736298300,PF_XBTUSD,LONG,91465.0,15m,Moderate 15m move (0.38%) breakout
+1736300700,PF_XBTUSD,SHORT,91163.0,15m,Large 15m move (0.43%) breakdown
+1736301600,PF_XBTUSD,SHORT,90827.0,15m,Large 15m move (0.42%) strong drop
+1736302500,PF_XBTUSD,LONG,90893.0,15m,Moderate 15m move (0.29%) bounce
+1736304600,PF_XBTUSD,SHORT,90735.0,15m,Moderate 15m move (0.36%) pullback
+1736305500,PF_XBTUSD,LONG,90740.0,15m,Moderate 15m move (0.27%) recovery
+1736308800,PF_XBTUSD,SHORT,90435.0,15m,Very large 15m move (0.54%) crash start
+1736309700,PF_XBTUSD,SHORT,90182.0,15m,Large 15m move (0.37%) continuation
+1736310600,PF_XBTUSD,LONG,90311.0,15m,Small 15m move (0.23%) stabilization
+1736311500,PF_XBTUSD,SHORT,89802.0,15m,Very large 15m move (0.59%) bottom
+1736312400,PF_XBTUSD,LONG,89981.0,15m,Very large 15m move (0.53%) reversal

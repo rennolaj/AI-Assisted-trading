@@ -422,7 +422,42 @@ public sealed class AlertWorker : BackgroundService
             _logger.LogWarning("MCP force-allow enabled but no eligible candidate found; falling back to LLM.");
         }
 
+        // Debug: Log Elliott candidates being sent to LLM
+        var candidatesSummary = adjudicationInput.Candidates.Candidates
+            .Select(c => new { 
+                c.WaveLabel, 
+                c.Score, 
+                c.Confidence,
+                ViolationCount = c.RuleViolations?.Count ?? 0,
+                FirstViolation = c.RuleViolations?.FirstOrDefault()?.Rule,
+                FirstSeverity = c.RuleViolations?.FirstOrDefault()?.Severity
+            })
+            .ToList();
+        _logger.LogInformation(
+            "DEBUG: Sending {CandidateCount} Elliott candidates to LLM for alert {AlertId}. Summary: {@CandidatesSummary}", 
+            adjudicationInput.Candidates.Candidates.Count,
+            alert.AlertId,
+            candidatesSummary);
+
         var llmResult = await _mcpGateway.AdjudicateElliottAsync(adjudicationInput, ct);
+        
+        // Debug: Log LLM decision result
+        if (llmResult.Ok && llmResult.Value is not null)
+        {
+            _logger.LogInformation(
+                "DEBUG: LLM returned decision={Decision} confidence={Confidence} reasoning={Reasoning} for alert {AlertId}",
+                llmResult.Value.Decision?.Decision ?? "NULL",
+                llmResult.Value.Decision?.Confidence ?? 0,
+                llmResult.Value.Decision?.Notes ?? "NULL",
+                alert.AlertId);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "DEBUG: LLM call failed for alert {AlertId}: {Error}",
+                alert.AlertId,
+                llmResult.Error?.Message ?? "Unknown error");
+        }
         
         // Persist LLM adjudication to database
         if (llmResult.Ok && llmResult.Value is not null)

@@ -166,6 +166,31 @@
 **Done when**: test suite includes 10+ positive LLM acceptance cases; fixtures serve as regression suite; tooling exists to capture and review new fixtures; complete alert scenario matrix documented; full dataflow validated for logical consistency; LLM interactions fully observable in database
 **Status**: Infrastructure complete, scenario framework built, dataflow analysis complete (M9.6 ✅), need LLM persistence (M9.7) and comprehensive fixture matrix
 
+### M10 - Additional Timeframe Support (NEW)
+**Goal**: Add 4H timeframe support for Elliott Wave analysis and indicator validation
+- Story M10.1: Add 4H timeframe to ElliottEngine validation configuration
+  - Update timeframe enum to include H4
+  - Add 4H lookback configuration (suggested: 5-7 days)
+  - Update minimum bar requirements for 4H analysis
+- Story M10.2: Update IndicatorEngine for 4H support
+  - Add 4H to INDICATOR_LOOKBACK configuration
+  - Configure appropriate lookback period for 4H indicators
+  - Update multi-timeframe analysis to include 4H
+- Story M10.3: Update environment configuration files
+  - Add INDICATOR_LOOKBACK_H4 to all .env templates
+  - Add ELLIOTT_LOOKBACK_H4 configuration
+  - Update documentation for 4H timeframe settings
+- Story M10.4: Update fixture generation and test infrastructure
+  - Ensure fetch-historical-candles.sh supports 4h resolution
+  - Update test matrix to include 4H test cases
+  - Add 4H fixtures to test suite
+- Story M10.5: Validate 4H Elliott pivot extraction
+  - Test minimum bar requirements (~200 bars for 4H)
+  - Validate pivot extraction quality on 4H timeframe
+  - Document 4H-specific Elliott Wave patterns
+**Done when**: System can analyze 4H timeframe alongside M5/M15/M30/H1; configuration files updated; tests pass with 4H data
+**Status**: Backlog - triggered by M9.2 test plan execution discovering 4H availability
+
 ## Implementation Order (Suggested)
 - M0, M1, M2, M3, M4, M5, M6, M7, M8, M9
 

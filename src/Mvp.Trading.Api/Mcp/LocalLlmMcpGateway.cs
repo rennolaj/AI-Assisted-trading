@@ -26,35 +26,92 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
     private readonly IPolicyStore _policyStore;
     private readonly IPromptTemplateStore _promptStore;
     private readonly IJsonSchemaValidator _schemaValidator;
+    private readonly ILogger<LocalLlmMcpGateway> _logger;
 
     public LocalLlmMcpGateway(
         ILocalLlmResponsesClient client,
         IMcpConfigStore configStore,
         IPolicyStore policyStore,
         IPromptTemplateStore promptStore,
-        IJsonSchemaValidator schemaValidator)
+        IJsonSchemaValidator schemaValidator,
+        ILogger<LocalLlmMcpGateway> logger)
     {
         _client = client;
         _configStore = configStore;
         _policyStore = policyStore;
         _promptStore = promptStore;
         _schemaValidator = schemaValidator;
+        _logger = logger;
     }
 
     public async Task<Result<McpAdjudicationResult>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
     {
         var policy = _policyStore.GetRiskPolicy();
-        var normalizedInput = new ElliottAdjudicationInput(input.Direction, input.Snapshot, input.Candidates, policy);
+        
+        // PRE-FILTER: Only send candidates without ERROR violations to reduce prompt size
+        var validCandidates = input.Candidates.Candidates
+            .Where(c => c.RuleViolations.All(v => v.Severity != "ERROR"))
+            .ToList();
+        
+        _logger.LogInformation(
+            "DEBUG MCP: Filtered {TotalCount} candidates down to {ValidCount} without ERROR violations for LLM",
+            input.Candidates.Candidates.Count,
+            validCandidates.Count);
+        
+        // Create filtered input with only valid candidates
+        var filteredCandidates = new ElliottCandidates(input.Candidates.BaseTimeframe, validCandidates);
+        var normalizedInput = new ElliottAdjudicationInput(input.Direction, input.Snapshot, filteredCandidates, policy);
+        
+        // Debug: Log candidates being sent to LLM
+        _logger.LogInformation(
+            "DEBUG MCP: Sending {CandidateCount} valid candidates to LLM. Direction={Direction}, Candidates={@Candidates}",
+            validCandidates.Count,
+            input.Direction,
+            validCandidates.Select(c => new {
+                c.CandidateId,
+                c.WaveLabel,
+                c.Score,
+                c.Confidence,
+                LongPrice = c.Invalidation.LongInvalidationPrice,
+                ShortPrice = c.Invalidation.ShortInvalidationPrice
+            }).ToList());
+        
         var inputJson = JsonSerializer.Serialize(normalizedInput, InputJsonOptions);
         var prompt = _promptStore.RenderAdjudicateElliottPrompt(inputJson);
+        
+        // Debug: Log prompt being sent (truncated)
+        var promptPreview = prompt.Length > 500 ? prompt.Substring(0, 500) + "..." : prompt;
+        _logger.LogInformation(
+            "DEBUG MCP: Sending prompt to LLM (length={Length} chars, est {TokenCount} tokens): {PromptPreview}",
+            prompt.Length,
+            prompt.Length / 4,  // Rough estimate: 4 chars per token
+            promptPreview);
 
-        return await InvokeWithContextAsync(
+        var result = await InvokeWithContextAsync(
             AdjudicateTool,
             prompt,
             LlmDecisionSchemaFile,
             schemaVersion: _configStore.GetConfig().SchemaVersions.LlmDecision,
             payload => JsonSerializer.Deserialize<LlmDecision>(payload, OutputJsonOptions),
             ct);
+            
+        // Debug: Log result
+        if (result.Ok && result.Value?.Decision != null)
+        {
+            _logger.LogInformation(
+                "DEBUG MCP: LLM returned decision={Decision}, confidence={Confidence}, notes={Notes}",
+                result.Value.Decision.Decision,
+                result.Value.Decision.Confidence,
+                result.Value.Decision.Notes);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "DEBUG MCP: LLM call failed or returned null. Error={Error}",
+                result.Error?.Message ?? "Unknown");
+        }
+        
+        return result;
     }
 
     public async Task<Result<StopLossSuggestion>> ExplainStopLossAsync(StopLossExplainInput input, CancellationToken ct)

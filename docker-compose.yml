@@ -73,6 +73,7 @@ services:
       Indicator__LookbackDaysByTimeframe__M30: "${INDICATOR_LOOKBACK_DAYS_M30:-1}"
       Indicator__LookbackDaysByTimeframe__H1: "${INDICATOR_LOOKBACK_DAYS_H1:-2}"
       Indicator__LookbackDaysByTimeframe__H2: "${INDICATOR_LOOKBACK_DAYS_H2:-3}"
+      Indicator__LookbackDaysByTimeframe__H4: "${INDICATOR_LOOKBACK_DAYS_H4:-7}"
       Redis__ConnectionString: "${REDIS_CONNECTION_STRING:-redis:6379}"
       Redis__AlertQueueKey: "${REDIS_ALERT_QUEUE_KEY:-mvp:alerts}"
     ports:

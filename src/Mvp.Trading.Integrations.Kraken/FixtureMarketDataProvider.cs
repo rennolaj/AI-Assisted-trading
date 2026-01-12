@@ -181,7 +181,7 @@ public sealed class FixtureMarketDataProvider : IMarketDataProvider
             var close = ReadDecimal(values[4]);
             var volume = values.Length > 6 ? ReadDecimal(values[6]) : 0m;
 
-            var openTime = DateTimeOffset.FromUnixTimeSeconds(tsSeconds);
+            var openTime = DateTimeOffset.FromUnixTimeMilliseconds(tsSeconds);
             candles.Add(new Candle(openTime, open, high, low, close, volume));
         }
 
