@@ -2,6 +2,18 @@
 
 Complete step-by-step guide for deploying the AI-Assisted Trading system to production using Docker containers.
 
+## Platform Compatibility
+
+**✅ Cross-Platform Support:** This guide works on **Linux, macOS, and Windows** with Docker Desktop installed.
+
+**Windows Users:**
+- All Docker commands work natively in PowerShell or CMD
+- For Unix utilities (`grep`, `jq`, `wc`), use one of:
+  - **Windows Subsystem for Linux (WSL)** - Recommended for full compatibility
+  - **Git Bash** - Includes common Unix tools
+  - **PowerShell equivalents** - Replace `grep` with `Select-String`, install `jq` via Chocolatey, etc.
+- Line continuations: Replace `\` with `` ` `` (backtick) in PowerShell multi-line commands
+
 ## Prerequisites
 
 ✅ **Required before starting:**

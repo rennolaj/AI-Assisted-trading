@@ -3,8 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    env_file:
-      - .env
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       TradingView__WebhookSecret: "${TRADINGVIEW_WEBHOOK_SECRET:-changeme}"
@@ -32,8 +30,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    env_file:
-      - .env
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Postgres__ConnectionString: "${POSTGRES_CONNECTION_STRING:-Host=postgres;Port=5432;Database=ai-trading-db;Username=postgres;Password=postgres}"
