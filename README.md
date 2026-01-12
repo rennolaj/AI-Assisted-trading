@@ -21,6 +21,16 @@ cp .env.example .env
 docker compose up --build
 ```
 
+### Production Deployment
+
+For complete production deployment with `.env.prod.local`, see the **[Production Deployment Guide](docs/production-deployment-guide.md)** for step-by-step instructions including:
+- Container build and startup procedures
+- Database initialization and health checks
+- Service verification and monitoring
+- TradingView webhook configuration
+- LLM provider setup (OpenAI, Local, or Auto-fallback)
+- Troubleshooting common issues
+
 ### With TradingView Webhook Access (ngrok)
 ```bash
 # Copy and configure environment
