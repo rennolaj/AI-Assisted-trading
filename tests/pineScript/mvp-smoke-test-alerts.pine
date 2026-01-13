@@ -1,5 +1,7 @@
 //@version=6
-indicator("MVP Smoke Test Alerts (5m)", overlay=true)
+indicator("MVP Smoke Test Alerts (1m realtime 10s)", overlay=true)
+// NOTE: timeframe parameter removed because this script issues alerts (side effects).
+// Set the TradingView chart timeframe to 1m manually when running this indicator.
 
 // ----------------------
 // Inputs (tune to trigger more/less often)
@@ -12,6 +14,20 @@ macdFast = input.int(12, "MACD Fast", minval=1)
 macdSlow = input.int(26, "MACD Slow", minval=2)
 macdSig  = input.int(9,  "MACD Signal", minval=1)
 
+// Stochastic inputs
+stochKlen = input.int(14, "Stochastic %K Length", minval=1)
+stochDlen = input.int(3, "Stochastic %D Length", minval=1)
+stochSmooth = input.int(3, "Stochastic Smoothing", minval=1)
+stochOB = input.float(80, "Stochastic Overbought", step=0.5)
+stochOS = input.float(20, "Stochastic Oversold", step=0.5)
+
+// StochRSI inputs
+stochRsiLen = input.int(14, "StochRSI RSI Length", minval=1)
+stochRsiK = input.int(3, "StochRSI %K Length", minval=1)
+stochRsiD = input.int(3, "StochRSI %D Length", minval=1)
+stochRsiOB = input.float(80, "StochRSI Overbought", step=0.5)
+stochRsiOS = input.float(20, "StochRSI Oversold", step=0.5)
+
 volLen   = input.int(20, "Volume SMA Length", minval=2)
 volMult  = input.float(1.5, "Volume Spike Multiplier", step=0.1)
 
@@ -21,13 +37,25 @@ maSlow   = input.int(21, "Slow EMA", minval=2)
 priceMovePct = input.float(0.40, "Price Move % (1 bar)", step=0.05)
 floodMode    = input.bool(true, "Flood Mode (extra realtime alerts)")
 microMovePct = input.float(0.01, "Micro Price Move %", step=0.01)
-pulseMs      = input.int(250, "Pulse Interval (ms)", minval=50, maxval=5000)
+// Realtime pulse interval (controls how often the same realtime condition can re-trigger)
+pulseMs = input.int(250, "Pulse Interval (ms)", minval=50, maxval=5000)
 
 // ----------------------
 // Calculations
 // ----------------------
 rsi = ta.rsi(close, rsiLen)
 [macdLine, signalLine, hist] = ta.macd(close, macdFast, macdSlow, macdSig)
+
+// Stochastic calculation (use 4-arg ta.stoch and apply smoothing with ta.sma)
+st_raw = ta.stoch(high, low, close, stochKlen)
+st_k = ta.sma(st_raw, stochSmooth)
+st_d = ta.sma(st_k, stochDlen)
+
+// StochRSI calculation (compute stoch on RSI using 4-arg ta.stoch, then smooth)
+srsi = ta.rsi(close, stochRsiLen)
+srsi_raw = ta.stoch(ta.highest(srsi, stochRsiLen), ta.lowest(srsi, stochRsiLen), srsi, stochRsiLen)
+srsi_k = ta.sma(srsi_raw, stochRsiK)
+srsi_d = ta.sma(srsi_k, stochRsiD)
 
 volSma   = ta.sma(volume, volLen)
 volRatio = na(volSma) or volSma == 0 ? na : volume / volSma
@@ -51,17 +79,31 @@ condVolSpike = not na(volRatio) and volRatio >= volMult
 condMaBull = ta.crossover(emaFastV, emaSlowV)
 condMaBear = ta.crossunder(emaFastV, emaSlowV)
 
+// Stochastic conditions
+condStochOB = st_k >= stochOB
+condStochOS = st_k <= stochOS
+condStochBull = ta.crossover(st_k, st_d)
+condStochBear = ta.crossunder(st_k, st_d)
+
+// StochRSI conditions
+condStochRsiOB = srsi_k >= stochRsiOB
+condStochRsiOS = srsi_k <= stochRsiOS
+condStochRsiBull = ta.crossover(srsi_k, srsi_d)
+condStochRsiBear = ta.crossunder(srsi_k, srsi_d)
+
 condPriceUp   = not na(priceChangePct) and priceChangePct >= priceMovePct
 condPriceDown = not na(priceChangePct) and priceChangePct <= -priceMovePct
 
 condMicroUp   = floodMode and not na(priceChangePct) and priceChangePct >= microMovePct
 condMicroDown = floodMode and not na(priceChangePct) and priceChangePct <= -microMovePct
 
+// Compute a pulse bucket based on configured seconds; this allows repeated realtime alerts
 pulseBucket = math.floor(timenow / pulseMs)
+
+// Per-condition last-sent buckets so each condition can re-trigger independently at the pulse interval
 var float lastPulseBucket = na
-condPulse = floodMode and barstate.isrealtime and (na(lastPulseBucket) or pulseBucket != lastPulseBucket)
-if condPulse
-    lastPulseBucket := pulseBucket
+
+condPulse = floodMode and barstate.isrealtime
 
 // ----------------------
 // Payload helpers
@@ -77,18 +119,18 @@ f_id(_conditionId) =>
     str.format("{0}-{1}-{2}-{3}", ticker, interval, _conditionId, str.tostring(time_close))
 
 f_json(_conditionId, _direction) =>
-    str.format(
-        "{{\"idempotencyKey\":\"{0}\",\"ticker\":\"{1}\",\"exchange\":\"{2}\",\"interval\":\"{3}\",\"close\":{4},\"volume\":{5},\"directionHint\":\"{6}\",\"symbolHint\":\"{7}\",\"reason\":\"{8}\"}}",
-        f_id(_conditionId),
-        ticker,
-        exchange,
-        interval,
-        f_num(close),
-        f_num(volume),
-        _direction,
-        ticker,
-        _conditionId
-    )
+    string s = "{"
+    s += "\"idempotencyKey\":\"" + f_id(_conditionId) + "\","
+    s += "\"ticker\":\"" + ticker + "\","
+    s += "\"exchange\":\"" + exchange + "\","
+    s += "\"interval\":\"" + interval + "\","
+    s += "\"close\":" + f_num(close) + ","
+    s += "\"volume\":" + f_num(volume) + ","
+    s += "\"directionHint\":\"" + _direction + "\","
+    s += "\"symbolHint\":\"" + ticker + "\","
+    s += "\"reason\":\"" + _conditionId + "\""
+    s += "}"
+    s
 
 dirFromTrend = emaFastV >= emaSlowV ? "LONG" : "SHORT"
 
@@ -114,15 +156,42 @@ if barstate.isconfirmed
     if condMaBear
         alert(f_json("EMA_BEAR_CROSS", "SHORT"), alert.freq_once_per_bar_close)
 
+    // Stochastic alerts
+    if condStochBull
+        alert(f_json("STOCH_BULL_CROSS", "LONG"), alert.freq_once_per_bar_close)
+    if condStochBear
+        alert(f_json("STOCH_BEAR_CROSS", "SHORT"), alert.freq_once_per_bar_close)
+    if condStochOB
+        alert(f_json("STOCH_OVERBOUGHT", "SHORT"), alert.freq_once_per_bar_close)
+    if condStochOS
+        alert(f_json("STOCH_OVERSOLD", "LONG"), alert.freq_once_per_bar_close)
+
+    // StochRSI alerts
+    if condStochRsiBull
+        alert(f_json("STOCHRSI_BULL_CROSS", "LONG"), alert.freq_once_per_bar_close)
+    if condStochRsiBear
+        alert(f_json("STOCHRSI_BEAR_CROSS", "SHORT"), alert.freq_once_per_bar_close)
+    if condStochRsiOB
+        alert(f_json("STOCHRSI_OVERBOUGHT", "SHORT"), alert.freq_once_per_bar_close)
+    if condStochRsiOS
+        alert(f_json("STOCHRSI_OVERSOLD", "LONG"), alert.freq_once_per_bar_close)
+
     if condPriceUp
         alert(f_json("PRICE_UP_MOVE", "LONG"), alert.freq_once_per_bar_close)
     if condPriceDown
         alert(f_json("PRICE_DOWN_MOVE", "SHORT"), alert.freq_once_per_bar_close)
 
 if barstate.isrealtime
+    // Realtime: allow each condition to re-trigger at most once per pulseIntervalSec
     if condPulse
-        alert(f_json("PULSE", dirFromTrend), alert.freq_all)
+        if na(lastPulseBucket) or pulseBucket != lastPulseBucket
+            alert(f_json("PULSE", dirFromTrend), alert.freq_all)
+            lastPulseBucket := pulseBucket
     if condMicroUp
-        alert(f_json("MICRO_UP_MOVE", "LONG"), alert.freq_all)
+        if na(lastPulseBucket) or pulseBucket != lastPulseBucket
+            alert(f_json("MICRO_UP_MOVE", "LONG"), alert.freq_all)
+            lastPulseBucket := pulseBucket
     if condMicroDown
-        alert(f_json("MICRO_DOWN_MOVE", "SHORT"), alert.freq_all)
+        if na(lastPulseBucket) or pulseBucket != lastPulseBucket
+            alert(f_json("MICRO_DOWN_MOVE", "SHORT"), alert.freq_all)
+            lastPulseBucket := pulseBucket
