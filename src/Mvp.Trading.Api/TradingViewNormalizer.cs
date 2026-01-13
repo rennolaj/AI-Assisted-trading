@@ -35,7 +35,7 @@ namespace Mvp.Trading.Api
 
             var root = doc.RootElement;
 
-            static string GetStringCaseInsensitive(JsonElement el, params string[] names)
+            static string? GetStringCaseInsensitive(JsonElement el, params string[] names)
             {
                 foreach (var n in names)
                 {
@@ -51,7 +51,7 @@ namespace Mvp.Trading.Api
                 return null;
             }
 
-            static bool TryParseDecimalLoosely(string s, out decimal result)
+            static bool TryParseDecimalLoosely(string? s, out decimal result)
             {
                 result = 0;
                 if (string.IsNullOrWhiteSpace(s)) return false;

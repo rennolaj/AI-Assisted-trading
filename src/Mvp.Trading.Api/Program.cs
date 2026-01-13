@@ -148,11 +148,11 @@ app.MapPost("/webhooks/tradingview/{secret}", async (
 
         request.EnableBuffering();
         // Log header-level information to help debug real-world webhook deliveries (Content-Type, User-Agent, etc.)
-        try
-        {
-            var headerMap = request.Headers.ToDictionary(h => h.Key, h => string.Join(',', h.Value));
-            logger.LogInformation("Incoming webhook headers: {Headers}", headerMap);
-        }
+            try
+            {
+                var headerMap = request.Headers.ToDictionary(h => h.Key, h => string.Join(',', h.Value.ToArray() ?? System.Array.Empty<string>()));
+                logger.LogInformation("Incoming webhook headers: {Headers}", headerMap);
+            }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Failed to enumerate request headers for logging.");
