@@ -191,6 +191,40 @@
 **Done when**: System can analyze 4H timeframe alongside M5/M15/M30/H1; configuration files updated; tests pass with 4H data
 **Status**: Backlog - triggered by M9.2 test plan execution discovering 4H availability
 
+### M11 - Scale-In Entry Strategy (NEW)
+**Goal**: Add configurable multiple entry points (dollar-cost averaging) to improve average entry price
+- Story M11.1: Add scale-in configuration to environment files
+  - Add RISK_SCALE_IN_ENABLED (true/false) - enable/disable feature
+  - Add RISK_SCALE_IN_COUNT (default: 3) - number of entry orders (including initial entry)
+  - Add RISK_SCALE_IN_SPACING_PCT (default: 0.5) - percentage spacing between entries
+  - Add RISK_SCALE_IN_SIZE_DISTRIBUTION (default: "EQUAL") - options: EQUAL, PYRAMID, REVERSE_PYRAMID
+  - All entries share the same stop-loss price (from initial Elliott invalidation)
+- Story M11.2: Update TradePlanBuilder to support multiple entries
+  - Generate entry orders array with spaced prices (initial, -0.5%, -1.0%)
+  - Split position size across entries based on distribution strategy
+  - EQUAL: 33%/33%/33%, PYRAMID: 25%/35%/40%, REVERSE_PYRAMID: 40%/35%/25%
+  - Maintain same stop-loss for all entries (no moving the stop)
+  - Adjust take-profit targets based on average entry (not initial entry)
+- Story M11.3: Update ExecutionService for staged order placement
+  - Place initial entry immediately (market or limit)
+  - Place additional entries as limit orders at calculated levels
+  - Track partial fills and average entry price
+  - Update take-profit calculations dynamically as entries fill
+  - Cancel unfilled scale-in orders if stop-loss is hit
+- Story M11.4: Add scale-in audit trail and metrics
+  - Track which entry orders filled and at what prices
+  - Calculate realized average entry vs planned entry
+  - Metrics: fill rate per entry level, average slippage per level
+  - Include scale-in details in execution receipts
+- Story M11.5: Add scale-in validation and testing
+  - Validate that stop-loss is never moved (risk stays constant)
+  - Test with historical fixtures to validate averaging improves outcomes
+  - Document scenarios where scale-in helps vs hurts
+  - Add configuration validation (count >= 1, spacing > 0, etc.)
+**Done when**: Trade plans can include 1-5 entry orders with configurable spacing; all entries share same stop-loss; execution tracks partial fills and average entry; full audit trail; feature can be disabled via config
+**Status**: Backlog - user request for dollar-cost averaging / scale-in feature
+**Rationale**: Improves average entry price if initial entry is premature; reduces impact of timing risk; common in professional trading to scale into positions
+
 ## Implementation Order (Suggested)
 - M0, M1, M2, M3, M4, M5, M6, M7, M8, M9
 

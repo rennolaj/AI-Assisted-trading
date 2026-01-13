@@ -147,6 +147,17 @@ app.MapPost("/webhooks/tradingview/{secret}", async (
         }
 
         request.EnableBuffering();
+        // Log header-level information to help debug real-world webhook deliveries (Content-Type, User-Agent, etc.)
+        try
+        {
+            var headerMap = request.Headers.ToDictionary(h => h.Key, h => string.Join(',', h.Value));
+            logger.LogInformation("Incoming webhook headers: {Headers}", headerMap);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enumerate request headers for logging.");
+        }
+
         string rawPayload;
         using (var reader = new StreamReader(request.Body, leaveOpen: true))
         {
@@ -161,72 +172,29 @@ app.MapPost("/webhooks/tradingview/{secret}", async (
 
 
         TradingViewWebhookPayload? payload = null;
+
+        // Enforce JSON-only payloads for this server. Parse and fail fast on invalid JSON.
+        var trimmedBody = rawPayload.Trim();
         try
         {
-            payload = JsonSerializer.Deserialize<TradingViewWebhookPayload>(rawPayload, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            // Normalize into a consistent shape even if producers vary in casing/structure.
+            var normalized = TradingViewNormalizer.Normalize(trimmedBody);
+            payload = new TradingViewWebhookPayload(
+                normalized.IdempotencyKey,
+                normalized.Ticker,
+                normalized.Exchange,
+                normalized.Interval,
+                normalized.Close,
+                normalized.Volume,
+                normalized.DirectionHint,
+                normalized.SymbolHint,
+                normalized.Reason
+            );
         }
-        catch (JsonException)
+        catch (InvalidOperationException ex)
         {
-            // Try a robust plain-text parse. Real-world alerts can look like:
-            // "BTCUSD.P Crossing 93,539.3" — interpret as: <ticker> <reason...> <price>
-            var trimmed = rawPayload?.Trim() ?? string.Empty;
-            logger.LogInformation("Raw webhook payload: {Payload}", trimmed);
-
-            // Collapse all whitespace (including non-breaking spaces) into single spaces before matching
-            var normalizedPayload = System.Text.RegularExpressions.Regex.Replace(trimmed, @"\s+", " ").Trim();
-            logger.LogInformation("Normalized webhook payload for matching: {Normalized}", normalizedPayload);
-
-            // Split into tokens. Require at least two tokens (ticker + price).
-            var tokens = normalizedPayload.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (tokens.Length >= 2)
-            {
-                var ticker = tokens[0];
-                var priceToken = tokens[^1];
-                var reason = tokens.Length > 2 ? string.Join(' ', tokens[1..^1]) : string.Empty;
-                logger.LogInformation("Plain-text tokens parsed. ticker={Ticker} reason={Reason} priceToken={PriceToken}", ticker, reason, priceToken);
-
-                // Extract numeric part from the price token (allow commas, dots)
-                var numericMatch = System.Text.RegularExpressions.Regex.Match(priceToken, @"[0-9\.,]+$");
-                var numericPart = numericMatch.Success ? numericMatch.Value : priceToken;
-                // Remove common thousands separators and non-breaking spaces
-                var cleaned = numericPart.Replace(",", "").Replace("\u00A0", "").Replace(" ", "");
-
-                if (decimal.TryParse(cleaned, System.Globalization.NumberStyles.AllowDecimalPoint | System.Globalization.NumberStyles.AllowThousands, System.Globalization.CultureInfo.InvariantCulture, out var price))
-                {
-                    decimal? close = price;
-
-                    // Deterministic idempotency key: SHA256 of the normalized payload
-                    var keySeed = normalizedPayload;
-                    var keyBytes = Encoding.UTF8.GetBytes(keySeed);
-                    var hash = SHA256.HashData(keyBytes);
-                    var idempotencyKey = Convert.ToHexString(hash).ToLowerInvariant();
-
-                    payload = new TradingViewWebhookPayload(
-                        IdempotencyKey: idempotencyKey,
-                        Ticker: ticker,
-                        Exchange: "unknown",
-                        Interval: "unknown",
-                        Close: close,
-                        Volume: null,
-                        DirectionHint: "UNKNOWN",
-                        SymbolHint: ticker,
-                        Reason: reason
-                    );
-                }
-                else
-                {
-                    logger.LogWarning("Failed to parse numeric price from token '{PriceToken}' (cleaned='{Cleaned}').", priceToken, cleaned);
-                    return Results.BadRequest(new { error = "Invalid numeric format in plain text payload." });
-                }
-            }
-            else
-            {
-                logger.LogWarning("Plain-text payload did not contain the required tokens for fallback parsing: {Payload}", trimmed);
-                return Results.BadRequest(new { error = "Invalid JSON or plain text format." });
-            }
+            logger.LogWarning(ex, "Expected JSON payload but normalization failed.");
+            return Results.BadRequest(new { error = ex.Message });
         }
 
         if (payload is null)

@@ -216,34 +216,31 @@ f_num(_v) =>
     na(_v) ? "null" : str.tostring(_v, "#.########")
 
 f_idempotencyKey(_direction) =>
-    str.format("{0}-{1}-{2}-{3}", 
-               symbolHint, 
-               timeframe.period, 
-               _direction, 
-               str.tostring(time_close))
+    symbolHint + "-" + timeframe.period + "-" + _direction + "-" + str.tostring(time_close)
 
 f_json(_direction, _confirmations, _confirmCount) =>
-    str.format(
-        '{"idempotencyKey":"%s","ticker":"%s","exchange":"%s","interval":"%s","close":%s,"volume":%s,"directionHint":"%s","symbolHint":"%s","reason":"MVP_PRODUCTION_SIGNAL","confirmations":"%s","confirmationCount":%s,"rsi":%s,"stochK":%s,"stochD":%s,"macd":%s,"macdSignal":%s,"macdHist":%s,"emaFast":%s,"emaSlow":%s}',
-        f_idempotencyKey(_direction),
-        symbolHint,
-        exchangeName,
-        timeframe.period,
-        f_num(close),
-        f_num(volume),
-        _direction,
-        symbolHint,
-        _confirmations,
-        str.tostring(_confirmCount),
-        f_num(rsi),
-        f_num(stochRsiK),
-        f_num(stochRsiD),
-        f_num(macdLine),
-        f_num(signalLine),
-        f_num(histLine),
-        f_num(emaFast),
-        f_num(emaSlow)
-    )
+    string s = "{"
+    s += "\"idempotencyKey\":\"" + f_idempotencyKey(_direction) + "\","
+    s += "\"ticker\":\"" + symbolHint + "\","
+    s += "\"exchange\":\"" + exchangeName + "\","
+    s += "\"interval\":\"" + timeframe.period + "\","
+    s += "\"close\":" + f_num(close) + ","
+    s += "\"volume\":" + f_num(volume) + ","
+    s += "\"directionHint\":\"" + _direction + "\","
+    s += "\"symbolHint\":\"" + symbolHint + "\","
+    s += "\"reason\":\"MVP_PRODUCTION_SIGNAL\","
+    s += "\"confirmations\":\"" + _confirmations + "\","
+    s += "\"confirmationCount\":" + str.tostring(_confirmCount) + ","
+    s += "\"rsi\":" + f_num(rsi) + ","
+    s += "\"stochK\":" + f_num(stochRsiK) + ","
+    s += "\"stochD\":" + f_num(stochRsiD) + ","
+    s += "\"macd\":" + f_num(macdLine) + ","
+    s += "\"macdSignal\":" + f_num(signalLine) + ","
+    s += "\"macdHist\":" + f_num(histLine) + ","
+    s += "\"emaFast\":" + f_num(emaFast) + ","
+    s += "\"emaSlow\":" + f_num(emaSlow)
+    s += "}"
+    s
 
 // ----------------------
 // Fire Alerts (Bar Close Only)
