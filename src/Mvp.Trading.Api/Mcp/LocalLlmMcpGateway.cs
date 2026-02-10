@@ -53,18 +53,11 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
             .Where(c => c.RuleViolations.All(v => v.Severity != "ERROR"))
             .ToList();
         
+        // Log filtering and candidate details in a single log entry
         _logger.LogInformation(
-            "DEBUG MCP: Filtered {TotalCount} candidates down to {ValidCount} without ERROR violations for LLM",
+            "DEBUG MCP: Filtered {TotalCount} candidates down to {ValidCount} without ERROR violations for LLM. Sending {CandidateCount} valid candidates to LLM. Direction={Direction}, Candidates={@Candidates}",
             input.Candidates.Candidates.Count,
-            validCandidates.Count);
-        
-        // Create filtered input with only valid candidates
-        var filteredCandidates = new ElliottCandidates(input.Candidates.BaseTimeframe, validCandidates);
-        var normalizedInput = new ElliottAdjudicationInput(input.Direction, input.Snapshot, filteredCandidates, policy);
-        
-        // Debug: Log candidates being sent to LLM
-        _logger.LogInformation(
-            "DEBUG MCP: Sending {CandidateCount} valid candidates to LLM. Direction={Direction}, Candidates={@Candidates}",
+            validCandidates.Count,
             validCandidates.Count,
             input.Direction,
             validCandidates.Select(c => new {
@@ -75,6 +68,10 @@ public sealed class LocalLlmMcpGateway : IMcpGateway
                 LongPrice = c.Invalidation.LongInvalidationPrice,
                 ShortPrice = c.Invalidation.ShortInvalidationPrice
             }).ToList());
+        
+        // Create filtered input with only valid candidates
+        var filteredCandidates = new ElliottCandidates(input.Candidates.BaseTimeframe, validCandidates);
+        var normalizedInput = new ElliottAdjudicationInput(input.Direction, input.Snapshot, filteredCandidates, policy);
         
         var inputJson = JsonSerializer.Serialize(normalizedInput, InputJsonOptions);
         var prompt = _promptStore.RenderAdjudicateElliottPrompt(inputJson);

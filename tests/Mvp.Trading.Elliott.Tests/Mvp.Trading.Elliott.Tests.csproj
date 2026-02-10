@@ -24,5 +24,7 @@
     <None Include="..\fixtures\kraken-futures\btcusd_p_m1.json" Link="fixtures\kraken-futures\btcusd_p_m1.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\kraken-futures\btcusd_p_m1_varied.json" Link="fixtures\kraken-futures\btcusd_p_m1_varied.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\fixtures\kraken-futures\pf_ethusd_m1_long.json" Link="fixtures\kraken-futures\pf_ethusd_m1_long.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\elliott\accept_bull.json" Link="fixtures\elliott\accept_bull.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\fixtures\elliott\reject_insufficient_pivots.json" Link="fixtures\elliott\reject_insufficient_pivots.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

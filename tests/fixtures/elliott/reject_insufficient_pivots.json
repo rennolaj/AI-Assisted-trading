@@ -1,0 +1,6 @@
+[
+  {"OpenTimeUtc":"2026-01-06T00:00:00Z","Open":200.0,"High":200.3,"Low":199.8,"Close":200.1,"Volume":5},
+  {"OpenTimeUtc":"2026-01-06T00:01:00Z","Open":200.1,"High":200.4,"Low":199.9,"Close":200.2,"Volume":4},
+  {"OpenTimeUtc":"2026-01-06T00:02:00Z","Open":200.2,"High":200.5,"Low":200.0,"Close":200.3,"Volume":6},
+  {"OpenTimeUtc":"2026-01-06T00:03:00Z","Open":200.3,"High":200.4,"Low":200.1,"Close":200.2,"Volume":3}
+]
