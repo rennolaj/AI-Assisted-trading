@@ -45,4 +45,34 @@ public sealed class WebhookHeaderSanitizerTests
         Assert.EndsWith("...(truncated)", sanitized["X-Trace"]);
         Assert.Equal(270, sanitized["X-Trace"].Length);
     }
+
+    [Fact]
+    public void SanitizeForLogging_RedactsFragmentMatchesCaseInsensitively()
+    {
+        var headers = new HeaderDictionary
+        {
+            ["x-custom-token"] = "top-secret",
+            ["X-WEBHOOK-SIGNATURE"] = "abc123"
+        };
+
+        var sanitized = WebhookHeaderSanitizer.SanitizeForLogging(headers);
+
+        Assert.Equal("[REDACTED]", sanitized["x-custom-token"]);
+        Assert.Equal("[REDACTED]", sanitized["X-WEBHOOK-SIGNATURE"]);
+    }
+
+    [Fact]
+    public void SanitizeForLogging_HandlesEmptyAndMultiValueNonSensitiveHeaders()
+    {
+        var headers = new HeaderDictionary
+        {
+            ["X-Empty"] = string.Empty,
+            ["X-Multi"] = new[] { "alpha", "beta\r\nvalue" }
+        };
+
+        var sanitized = WebhookHeaderSanitizer.SanitizeForLogging(headers);
+
+        Assert.Equal(string.Empty, sanitized["X-Empty"]);
+        Assert.Equal("alpha,beta  value", sanitized["X-Multi"]);
+    }
 }
