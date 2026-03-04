@@ -21,3 +21,6 @@ infra/azure/parameters.local.json
 
 # Logs
 error.log
+
+# Scratch / deprecated docs
+DRY_RUN_CHECKLIST.md
