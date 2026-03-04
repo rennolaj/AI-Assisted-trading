@@ -5,3 +5,22 @@
 **/obj/
 .DS_Store
 .pdf_text/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.backup
+infra/terraform/terraform.tfvars
+infra/terraform/tfplan
+
+# Bicep local parameters (may contain secrets)
+infra/azure/parameters.local.json
+
+# Git worktrees
+.worktrees/
+
+# Logs
+error.log
+
+# Scratch / deprecated docs
+DRY_RUN_CHECKLIST.md

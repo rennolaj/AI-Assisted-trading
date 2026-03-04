@@ -5,6 +5,92 @@ This repository contains everything about my own AI assisted trading server.
 - .NET SDK: 10.0.x (installed via Homebrew cask `dotnet-sdk`)
 - Scripts: `scripts/restore.sh`, `scripts/build.sh`, `scripts/test.sh`
 
+## Multi-Agent Setup (Any Feature)
+
+This setup is fully generic and driven by two scripts:
+- `scripts/agents/bootstrap-feature.sh`
+- `scripts/agents/run-feature-once.sh`
+
+It runs agents in parallel with file-based communication and stage gates.
+
+### Communication model
+- Agent terminals are managed by `tmux`.
+- Agent coordination is through `/tmp/multi-agent-sync/<scope>`:
+  - `context.md`: shared feature context
+  - `inbox/<agent>.md`: role instructions
+  - `outbox/<agent>.md`: role outputs
+  - `state/<agent>.done`: stage completion markers
+
+### Stage order
+1. `builder`
+2. `reviewer` + `quality` (parallel)
+3. `tester`
+4. `integrator`
+5. `orchestrator` final decision
+
+### Step-by-step guide
+
+1. Start clean (optional but recommended):
+```bash
+/opt/homebrew/bin/tmux kill-server
+```
+
+2. Bootstrap a feature scope:
+```bash
+./scripts/agents/bootstrap-feature.sh \
+  --scope <feature-scope-id> \
+  --base main \
+  --with-tmux \
+  --force
+```
+
+3. Set shared context:
+```bash
+nano /tmp/multi-agent-sync/<feature-scope-id>/context.md
+```
+
+4. Dispatch one coordinated run:
+```bash
+./scripts/agents/run-feature-once.sh \
+  --scope <feature-scope-id> \
+  --session multi-agent-<feature-scope-id>
+```
+
+Alternative dispatch with pre-written context:
+```bash
+./scripts/agents/run-feature-once.sh \
+  --scope <feature-scope-id> \
+  --session multi-agent-<feature-scope-id> \
+  --context-file <path-to-context.md>
+```
+
+5. Observe and monitor:
+```bash
+tmux attach -t multi-agent-<feature-scope-id>
+```
+- Window `6` is the monitor.
+- `state/*.done` indicates stage completion.
+- `outbox/*.md` contains each agent report.
+
+6. Verify completion:
+```bash
+ls -1 /tmp/multi-agent-sync/<feature-scope-id>/state
+ls -1 /tmp/multi-agent-sync/<feature-scope-id>/outbox
+```
+
+### Troubleshooting
+- If `watch` is not installed on macOS:
+  - scripts automatically use a portable `while` loop monitor fallback.
+- If an agent appears stuck:
+  - inspect pane output in tmux;
+  - restart only that stage by re-running dispatch or sending a new `codex exec` in that pane.
+- If reviewer/quality/tester do not see builder changes:
+  - ensure code handoff is present in their branches/worktrees before re-running gates.
+
+### Policy constraints (always enforced)
+- `NO_PUSH`: no `git push`.
+- `INFRA_FREEZE`: no Terraform/Bicep modifications.
+
 ## Quick start
 ```bash
 brew install --cask dotnet-sdk
