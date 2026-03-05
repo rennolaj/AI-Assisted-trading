@@ -119,8 +119,8 @@ SYNC_DIR="/tmp/multi-agent-sync/${SCOPE}"
 PROMPT_DIR="${SYNC_DIR}/prompts"
 LOG_DIR="/tmp/multi-agent-logs/${SCOPE}"
 
-AGENTS=(builder reviewer quality tester integrator)
-WINDOWS=(orchestrator builder reviewer quality tester integrator monitor)
+AGENTS=(planner builder reviewer quality tester integrator)
+WINDOWS=(orchestrator planner builder reviewer quality tester integrator monitor)
 
 mkdir -p "$WORKTREE_ROOT" "$SYNC_DIR/inbox" "$SYNC_DIR/outbox" "$SYNC_DIR/state" "$PROMPT_DIR" "$LOG_DIR"
 find "$SYNC_DIR/inbox" "$SYNC_DIR/outbox" "$SYNC_DIR/state" "$PROMPT_DIR" -type f -delete
@@ -167,12 +167,13 @@ done
 
 ORCH_PATH="$(resolve_worktree_for_branch "$BASE_BRANCH" "$WORKTREE_ROOT/orchestrator" || true)"
 BUILDER_PATH="$(resolve_worktree_for_branch "agent/builder/${SCOPE}" "$WORKTREE_ROOT/builder" || true)"
+PLANNER_PATH="$(resolve_worktree_for_branch "agent/planner/${SCOPE}" "$WORKTREE_ROOT/planner" || true)"
 REVIEWER_PATH="$(resolve_worktree_for_branch "agent/reviewer/${SCOPE}" "$WORKTREE_ROOT/reviewer" || true)"
 QUALITY_PATH="$(resolve_worktree_for_branch "agent/quality/${SCOPE}" "$WORKTREE_ROOT/quality" || true)"
 TESTER_PATH="$(resolve_worktree_for_branch "agent/tester/${SCOPE}" "$WORKTREE_ROOT/tester" || true)"
 INTEGRATOR_PATH="$(resolve_worktree_for_branch "agent/integrator/${SCOPE}" "$WORKTREE_ROOT/integrator" || true)"
 
-for var_name in ORCH_PATH BUILDER_PATH REVIEWER_PATH QUALITY_PATH TESTER_PATH INTEGRATOR_PATH; do
+for var_name in ORCH_PATH PLANNER_PATH BUILDER_PATH REVIEWER_PATH QUALITY_PATH TESTER_PATH INTEGRATOR_PATH; do
   if [[ -z "${!var_name}" ]]; then
     echo "Unable to resolve worktree path for ${var_name}" >&2
     exit 1
@@ -188,11 +189,12 @@ Contract:
 - state/<agent>.done: phase complete marker
 
 Execution order:
-1) builder
-2) reviewer + quality (parallel)
-3) tester
-4) integrator
-5) orchestrator final decision
+1) planner
+2) builder
+3) reviewer + quality (parallel)
+4) tester
+5) integrator
+6) orchestrator final decision
 
 Hard constraints:
 - NO_PUSH: no git push
@@ -219,8 +221,20 @@ cat > "$SYNC_DIR/context.md" <<CTX
 - Replace this with testable acceptance criteria.
 CTX
 
+cat > "$SYNC_DIR/inbox/planner.md" <<'EOF_PLANNER'
+Analyze scope and create a deterministic implementation plan.
+Write report to outbox/planner.md:
+- assumptions
+- plan steps
+- risks
+- stop conditions
+Then create state/planner.done
+EOF_PLANNER
+
 cat > "$SYNC_DIR/inbox/builder.md" <<'EOF_BUILDER'
+Wait for state/planner.done.
 Implement the feature for your scope.
+Use outbox/planner.md as implementation guide.
 Write report to outbox/builder.md:
 - files changed
 - commands + results
@@ -295,31 +309,32 @@ if [[ "$WITH_TMUX" -eq 1 ]]; then
   fi
 
   tmux new-session -d -s "$SESSION" -n orchestrator -c "$ORCH_PATH"
-  tmux new-window -t "$SESSION":1 -n builder -c "$BUILDER_PATH"
-  tmux new-window -t "$SESSION":2 -n reviewer -c "$REVIEWER_PATH"
-  tmux new-window -t "$SESSION":3 -n quality -c "$QUALITY_PATH"
-  tmux new-window -t "$SESSION":4 -n tester -c "$TESTER_PATH"
-  tmux new-window -t "$SESSION":5 -n integrator -c "$INTEGRATOR_PATH"
-  tmux new-window -t "$SESSION":6 -n monitor -c "$ROOT"
+  tmux new-window -t "$SESSION":1 -n planner -c "$PLANNER_PATH"
+  tmux new-window -t "$SESSION":2 -n builder -c "$BUILDER_PATH"
+  tmux new-window -t "$SESSION":3 -n reviewer -c "$REVIEWER_PATH"
+  tmux new-window -t "$SESSION":4 -n quality -c "$QUALITY_PATH"
+  tmux new-window -t "$SESSION":5 -n tester -c "$TESTER_PATH"
+  tmux new-window -t "$SESSION":6 -n integrator -c "$INTEGRATOR_PATH"
+  tmux new-window -t "$SESSION":7 -n monitor -c "$ROOT"
 
-  for idx in 0 1 2 3 4 5; do
+  for idx in 0 1 2 3 4 5 6; do
     tmux send-keys -t "$SESSION:$idx" 'pwd; git branch --show-current' C-m
   done
 
-  for pair in "0 orchestrator" "1 builder" "2 reviewer" "3 quality" "4 tester" "5 integrator"; do
+  for pair in "0 orchestrator" "1 planner" "2 builder" "3 reviewer" "4 quality" "5 tester" "6 integrator"; do
     idx="${pair%% *}"
     role="${pair##* }"
     tmux pipe-pane -o -t "$SESSION:$idx" "cat >> ${LOG_DIR}/${role}.log"
   done
 
   if command -v watch >/dev/null 2>&1; then
-    tmux send-keys -t "$SESSION:6" "watch -n 2 'echo === STATE ===; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo === OUTBOX ===; ls -1 ${SYNC_DIR}/outbox 2>/dev/null'" C-m
+    tmux send-keys -t "$SESSION:7" "watch -n 2 'echo === STATE ===; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo === OUTBOX ===; ls -1 ${SYNC_DIR}/outbox 2>/dev/null'" C-m
   else
-    tmux send-keys -t "$SESSION:6" "while true; do clear; echo '=== STATE ==='; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo '=== OUTBOX ==='; ls -1 ${SYNC_DIR}/outbox 2>/dev/null; sleep 2; done" C-m
+    tmux send-keys -t "$SESSION:7" "while true; do clear; echo '=== STATE ==='; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo '=== OUTBOX ==='; ls -1 ${SYNC_DIR}/outbox 2>/dev/null; sleep 2; done" C-m
   fi
 
   if [[ "$SEED_PROMPTS" -eq 1 ]]; then
-    for pair in "0 orchestrator" "1 builder" "2 reviewer" "3 quality" "4 tester" "5 integrator"; do
+    for pair in "0 orchestrator" "1 planner" "2 builder" "3 reviewer" "4 quality" "5 tester" "6 integrator"; do
       idx="${pair%% *}"
       role="${pair##* }"
       tmux send-keys -t "$SESSION:$idx" C-c
@@ -340,6 +355,7 @@ Base branch: ${BASE_BRANCH}
 Worktrees: ${WORKTREE_ROOT}
 Resolved paths:
 - orchestrator: ${ORCH_PATH}
+- planner: ${PLANNER_PATH}
 - builder: ${BUILDER_PATH}
 - reviewer: ${REVIEWER_PATH}
 - quality: ${QUALITY_PATH}

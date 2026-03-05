@@ -1,0 +1,23 @@
+dataDir: ~/.agent-orchestrator
+worktreeDir: ~/.worktrees
+port: 3000
+defaults:
+  runtime: tmux
+  agent: codex
+  workspace: worktree
+  notifiers:
+    - desktop
+projects:
+  AI-Assisted:
+    name: AI-Assisted
+    sessionPrefix: aia
+    repo: rennolaj/AI-Assisted-trading
+    path: /Users/jrennola/Hobby/AI-Assisted
+    defaultBranch: main
+    tracker:
+      plugin: github
+    agentRules: |-
+      Always run tests before pushing.
+      Use conventional commits (feat:, fix:, chore:, docs:, refactor:, test:).
+      Link issue numbers in commit messages.
+      Write clear commit messages that explain WHY, not just WHAT.

@@ -10,6 +10,8 @@ This repository contains everything about my own AI assisted trading server.
 This setup is fully generic and driven by two scripts:
 - `scripts/agents/bootstrap-feature.sh`
 - `scripts/agents/run-feature-once.sh`
+- `scripts/agents/run-feature-once-ao.sh`
+- `scripts/agents/create-followup-bugs.sh`
 
 It runs agents in parallel with file-based communication and stage gates.
 
@@ -22,13 +24,85 @@ It runs agents in parallel with file-based communication and stage gates.
   - `state/<agent>.done`: stage completion markers
 
 ### Stage order
-1. `builder`
-2. `reviewer` + `quality` (parallel)
-3. `tester`
-4. `integrator`
-5. `orchestrator` final decision
+1. `planner`
+2. `builder`
+3. `reviewer` + `quality` (parallel)
+4. `tester`
+5. `integrator`
+6. `orchestrator` final decision
 
-### Step-by-step guide
+### AO integration (recommended)
+
+Use this path when you want AO-managed sessions, dashboard visibility, and `ao` lifecycle commands.
+
+Prerequisites:
+- AO CLI installed and available as `ao`
+- `agent-orchestrator.yaml` in repo root
+- `defaults.agent: codex` in `agent-orchestrator.yaml`
+- `tmux` installed
+
+Minimal AO config for this repo (already supported):
+```yaml
+defaults:
+  runtime: tmux
+  agent: codex
+  workspace: worktree
+
+projects:
+  AI-Assisted:
+    repo: rennolaj/AI-Assisted-trading
+    path: /Users/jrennola/Hobby/AI-Assisted
+    defaultBranch: main
+    tracker:
+      plugin: github
+```
+
+Activation steps:
+
+1. Start AO dashboard + orchestrator:
+```bash
+ao start
+```
+
+2. Bootstrap feature contract files/worktrees:
+```bash
+./scripts/agents/bootstrap-feature.sh \
+  --scope <feature-scope-id> \
+  --base main
+```
+
+3. Run AO-based multi-agent pass:
+```bash
+./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
+```
+
+Optional: include automatic backlog follow-up bug generation:
+```bash
+./scripts/agents/run-feature-once-ao.sh \
+  --scope <feature-scope-id> \
+  --followup-bugs
+```
+
+4. Inspect/operate:
+```bash
+ao status
+ao session ls
+```
+
+5. Attach to sessions:
+- The AO runner prints all `tmux attach -t <name>` targets after spawning.
+- Orchestrator session is also available from `ao start` output.
+
+6. Cleanup:
+```bash
+ao session kill <session-id>
+# or stop everything:
+ao stop AI-Assisted
+```
+
+### Legacy tmux-only flow
+
+Use this path only if you explicitly want the original custom tmux session orchestration (without AO session layer).
 
 1. Start clean (optional but recommended):
 ```bash
@@ -78,14 +152,35 @@ ls -1 /tmp/multi-agent-sync/<feature-scope-id>/state
 ls -1 /tmp/multi-agent-sync/<feature-scope-id>/outbox
 ```
 
+7. Check backlog follow-up bugs:
+```bash
+rg -n "AUTOBUG:<feature-scope-id>:" docs/backlog.md
+```
+
+Backlog bug policy:
+- If `reviewer`, `quality`, or `integrator` report blocking findings, a backlog bug is auto-added.
+- Auto-added bugs are marked `PRIORITY: NEXT_ITERATION`.
+- The auto bug marker format is:
+  - `AUTOBUG:<scope>:reviewer`
+  - `AUTOBUG:<scope>:quality`
+  - `AUTOBUG:<scope>:integrator`
+
 ### Troubleshooting
 - If `watch` is not installed on macOS:
   - scripts automatically use a portable `while` loop monitor fallback.
 - If an agent appears stuck:
   - inspect pane output in tmux;
   - restart only that stage by re-running dispatch or sending a new `codex exec` in that pane.
+- If using AO flow and a session gets stuck:
+  - check `ao status`;
+  - attach using printed tmux target;
+  - send corrective instruction with `ao send <session> "<message>"`.
 - If reviewer/quality/tester do not see builder changes:
   - ensure code handoff is present in their branches/worktrees before re-running gates.
+- If you need to re-run backlog bug generation manually:
+```bash
+./scripts/agents/create-followup-bugs.sh --scope <feature-scope-id>
+```
 
 ### Policy constraints (always enforced)
 - `NO_PUSH`: no `git push`.

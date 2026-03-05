@@ -80,13 +80,14 @@ resolve_worktree_for_branch() {
 }
 
 ORCH_PATH="$(resolve_worktree_for_branch "main" "${ROOT}/.worktrees/${SCOPE}/orchestrator" || true)"
+PLANNER_PATH="$(resolve_worktree_for_branch "agent/planner/${SCOPE}" "${ROOT}/.worktrees/${SCOPE}/planner" || true)"
 BUILDER_PATH="$(resolve_worktree_for_branch "agent/builder/${SCOPE}" "${ROOT}/.worktrees/${SCOPE}/builder" || true)"
 REVIEWER_PATH="$(resolve_worktree_for_branch "agent/reviewer/${SCOPE}" "${ROOT}/.worktrees/${SCOPE}/reviewer" || true)"
 QUALITY_PATH="$(resolve_worktree_for_branch "agent/quality/${SCOPE}" "${ROOT}/.worktrees/${SCOPE}/quality" || true)"
 TESTER_PATH="$(resolve_worktree_for_branch "agent/tester/${SCOPE}" "${ROOT}/.worktrees/${SCOPE}/tester" || true)"
 INTEGRATOR_PATH="$(resolve_worktree_for_branch "agent/integrator/${SCOPE}" "${ROOT}/.worktrees/${SCOPE}/integrator" || true)"
 
-for var_name in ORCH_PATH BUILDER_PATH REVIEWER_PATH QUALITY_PATH TESTER_PATH INTEGRATOR_PATH; do
+for var_name in ORCH_PATH PLANNER_PATH BUILDER_PATH REVIEWER_PATH QUALITY_PATH TESTER_PATH INTEGRATOR_PATH; do
   if [[ -z "${!var_name}" ]]; then
     echo "Unable to resolve worktree path for ${var_name}. Run bootstrap first for scope '${SCOPE}'." >&2
     exit 1
@@ -107,22 +108,24 @@ run_in_pane() {
   "$TMUX_BIN" send-keys -t "$SESSION:$pane" "$cmd" C-m
 }
 
-run_in_pane 1 "$BUILDER_PATH" "codex exec \"Read ${SYNC_DIR}/context.md and ${SYNC_DIR}/inbox/builder.md. Do the builder task and write report to ${SYNC_DIR}/outbox/builder.md. When done create ${SYNC_DIR}/state/builder.done. Do not push. Do not modify terraform/bicep.\""
+run_in_pane 1 "$PLANNER_PATH" "codex exec \"Read ${SYNC_DIR}/context.md and ${SYNC_DIR}/inbox/planner.md. Do planner task and write report to ${SYNC_DIR}/outbox/planner.md. When done create ${SYNC_DIR}/state/planner.done. Do not push. Do not modify terraform/bicep.\""
 
-run_in_pane 2 "$REVIEWER_PATH" "while [ ! -f ${SYNC_DIR}/state/builder.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/reviewer.md and ${SYNC_DIR}/outbox/builder.md. Do reviewer task and write report to ${SYNC_DIR}/outbox/reviewer.md. When done create ${SYNC_DIR}/state/reviewer.done. Do not push. Do not modify terraform/bicep.\""
+run_in_pane 2 "$BUILDER_PATH" "while [ ! -f ${SYNC_DIR}/state/planner.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/builder.md and ${SYNC_DIR}/outbox/planner.md. Do the builder task and write report to ${SYNC_DIR}/outbox/builder.md. When done create ${SYNC_DIR}/state/builder.done. Do not push. Do not modify terraform/bicep.\""
 
-run_in_pane 3 "$QUALITY_PATH" "while [ ! -f ${SYNC_DIR}/state/builder.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/quality.md and ${SYNC_DIR}/outbox/builder.md. Run quality task and write report to ${SYNC_DIR}/outbox/quality.md. When done create ${SYNC_DIR}/state/quality.done. Do not push. Do not modify terraform/bicep.\""
+run_in_pane 3 "$REVIEWER_PATH" "while [ ! -f ${SYNC_DIR}/state/builder.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/reviewer.md and ${SYNC_DIR}/outbox/builder.md. Do reviewer task and write report to ${SYNC_DIR}/outbox/reviewer.md. When done create ${SYNC_DIR}/state/reviewer.done. Do not push. Do not modify terraform/bicep.\""
 
-run_in_pane 4 "$TESTER_PATH" "while [ ! -f ${SYNC_DIR}/state/reviewer.done ] || [ ! -f ${SYNC_DIR}/state/quality.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/tester.md, ${SYNC_DIR}/outbox/reviewer.md, ${SYNC_DIR}/outbox/quality.md. Run tester task and write report to ${SYNC_DIR}/outbox/tester.md. When done create ${SYNC_DIR}/state/tester.done. Do not push. Do not modify terraform/bicep.\""
+run_in_pane 4 "$QUALITY_PATH" "while [ ! -f ${SYNC_DIR}/state/builder.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/quality.md and ${SYNC_DIR}/outbox/builder.md. Run quality task and write report to ${SYNC_DIR}/outbox/quality.md. When done create ${SYNC_DIR}/state/quality.done. Do not push. Do not modify terraform/bicep.\""
 
-run_in_pane 5 "$INTEGRATOR_PATH" "while [ ! -f ${SYNC_DIR}/state/tester.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/integrator.md, ${SYNC_DIR}/outbox/tester.md. Run integrator task and write report to ${SYNC_DIR}/outbox/integrator.md. When done create ${SYNC_DIR}/state/integrator.done. Do not push. Do not modify terraform/bicep.\""
+run_in_pane 5 "$TESTER_PATH" "while [ ! -f ${SYNC_DIR}/state/reviewer.done ] || [ ! -f ${SYNC_DIR}/state/quality.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/tester.md, ${SYNC_DIR}/outbox/reviewer.md, ${SYNC_DIR}/outbox/quality.md. Run tester task and write report to ${SYNC_DIR}/outbox/tester.md. When done create ${SYNC_DIR}/state/tester.done. Do not push. Do not modify terraform/bicep.\""
 
-run_in_pane 0 "$ORCH_PATH" "while [ ! -f ${SYNC_DIR}/state/integrator.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/README.txt, ${SYNC_DIR}/context.md, and all files under ${SYNC_DIR}/outbox. Produce final orchestrator decision in ${SYNC_DIR}/outbox/orchestrator.md and create ${SYNC_DIR}/state/orchestrator.done.\""
+run_in_pane 6 "$INTEGRATOR_PATH" "while [ ! -f ${SYNC_DIR}/state/tester.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/integrator.md, ${SYNC_DIR}/outbox/tester.md. Run integrator task and write report to ${SYNC_DIR}/outbox/integrator.md. When done create ${SYNC_DIR}/state/integrator.done. Do not push. Do not modify terraform/bicep.\""
+
+run_in_pane 0 "$ORCH_PATH" "while [ ! -f ${SYNC_DIR}/state/integrator.done ]; do sleep 2; done; codex exec \"Read ${SYNC_DIR}/README.txt, ${SYNC_DIR}/context.md, and all files under ${SYNC_DIR}/outbox. Produce final orchestrator decision in ${SYNC_DIR}/outbox/orchestrator.md and create ${SYNC_DIR}/state/orchestrator.done.\"; ${ROOT}/scripts/agents/create-followup-bugs.sh --scope ${SCOPE}"
 
 if command -v watch >/dev/null 2>&1; then
-  "$TMUX_BIN" send-keys -t "$SESSION:6" "watch -n 2 'echo === STATE ===; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo === OUTBOX ===; ls -1 ${SYNC_DIR}/outbox 2>/dev/null'" C-m
+  "$TMUX_BIN" send-keys -t "$SESSION:7" "watch -n 2 'echo === STATE ===; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo === OUTBOX ===; ls -1 ${SYNC_DIR}/outbox 2>/dev/null'" C-m
 else
-  "$TMUX_BIN" send-keys -t "$SESSION:6" "while true; do clear; echo '=== STATE ==='; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo '=== OUTBOX ==='; ls -1 ${SYNC_DIR}/outbox 2>/dev/null; sleep 2; done" C-m
+  "$TMUX_BIN" send-keys -t "$SESSION:7" "while true; do clear; echo '=== STATE ==='; ls -1 ${SYNC_DIR}/state 2>/dev/null; echo; echo '=== OUTBOX ==='; ls -1 ${SYNC_DIR}/outbox 2>/dev/null; sleep 2; done" C-m
 fi
 
 echo "Dispatched coordinated run for scope: ${SCOPE}"

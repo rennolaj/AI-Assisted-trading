@@ -235,3 +235,14 @@
 - Future: run MCP as separate container instead of embedded
 - Future: additional LLM providers beyond OpenAI/local (Azure OpenAI, etc.)
 - Future: policy/config source (DB or remote store vs file-based)
+
+### Multi-Agent Follow-up Bugs (Auto)
+**Goal**: Track blocking findings from reviewer/quality/integrator for the next iteration.
+- Story BUG.2026-03-04.reviewer: [PRIORITY: NEXT_ITERATION] m9-7-llm-adjudication-persistence-observability - REVIEWER reported blocking findings (AUTOBUG:m9-7-llm-adjudication-persistence-observability:reviewer)
+  - Source: /tmp/multi-agent-sync/m9-7-llm-adjudication-persistence-observability/outbox/reviewer.md
+  - Trigger: 1. **HIGH** - Forced adjudication path is never persisted
+  - Required action: Fix blocking findings before continuing feature delivery.
+- Story BUG.2026-03-04.quality: [PRIORITY: NEXT_ITERATION] m9-7-llm-adjudication-persistence-observability - QUALITY reported blocking findings (AUTOBUG:m9-7-llm-adjudication-persistence-observability:quality)
+  - Source: /tmp/multi-agent-sync/m9-7-llm-adjudication-persistence-observability/outbox/quality.md
+  - Trigger: QUALITY_STATUS: CHANGES_REQUIRED
+  - Required action: Fix blocking findings before continuing feature delivery.
