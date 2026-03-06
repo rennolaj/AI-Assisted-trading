@@ -12,9 +12,17 @@ This file defines the reusable local multi-agent workflow for this repository.
 - `integrator`: integration/dataflow verification.
 
 ## Global Policy
-- `NO_PUSH`: no `git push` by any agent.
+- `NO_PUSH` (default): no `git push` by agents in coordinated local multi-agent runs.
 - `INFRA_FREEZE`: no Terraform/Bicep changes.
 - Keep changes inside feature scope.
+
+## AO PR Flow Exception
+- In AO-managed issue sessions, agents may push and create PRs when the session/task instructions explicitly require it.
+- When this exception is used, still enforce:
+  - tests must pass before push
+  - conventional commits
+  - issue linkage in commits/PR description
+  - focused PR scope
 
 ## Branch/Worktree Model
 - Branch naming per scope:
@@ -70,6 +78,13 @@ nano /tmp/multi-agent-sync/<feature-scope-id>/context.md
 ```bash
 ao start
 ./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
+```
+
+Optional (enable push/PR actions for AO-managed issue-delivery runs):
+```bash
+./scripts/agents/run-feature-once-ao.sh \
+  --scope <feature-scope-id> \
+  --allow-push
 ```
 
 Optional (auto backlog follow-up bug generation):

@@ -76,6 +76,13 @@ ao start
 ./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
 ```
 
+Optional: allow push/PR actions for AO-managed issue-delivery sessions:
+```bash
+./scripts/agents/run-feature-once-ao.sh \
+  --scope <feature-scope-id> \
+  --allow-push
+```
+
 Optional: include automatic backlog follow-up bug generation:
 ```bash
 ./scripts/agents/run-feature-once-ao.sh \
@@ -183,7 +190,8 @@ Backlog bug policy:
 ```
 
 ### Policy constraints (always enforced)
-- `NO_PUSH`: no `git push`.
+- `NO_PUSH` by default for coordinated local multi-agent runs (`bootstrap-feature.sh` + run scripts).
+- AO-managed issue sessions can push/create PR when explicitly instructed by the AO task/session contract.
 - `INFRA_FREEZE`: no Terraform/Bicep modifications.
 
 ## Quick start

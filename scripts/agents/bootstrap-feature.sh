@@ -197,7 +197,8 @@ Execution order:
 6) orchestrator final decision
 
 Hard constraints:
-- NO_PUSH: no git push
+- NO_PUSH (default): no git push for coordinated local multi-agent runs
+- AO PR flow exception: push/PR allowed only when explicitly required by AO-managed issue session instructions
 - INFRA_FREEZE: do not modify terraform/bicep
 SYNC
 
@@ -214,7 +215,7 @@ cat > "$SYNC_DIR/context.md" <<CTX
 - Replace this with excluded items.
 
 ## Constraints
-- NO_PUSH
+- NO_PUSH (default for local coordinated runs; AO issue sessions may explicitly allow push/PR)
 - INFRA_FREEZE (no terraform/bicep changes)
 
 ## Acceptance Criteria

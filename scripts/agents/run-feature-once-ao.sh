@@ -9,6 +9,7 @@ Usage:
 Options:
   --project <id>      AO project id from agent-orchestrator.yaml (default: AI-Assisted)
   --agent <name>      Agent plugin override for ao spawn (default: codex)
+  --allow-push        Allow git push/PR actions for this AO run (default: disabled)
   --followup-bugs     Run create-followup-bugs.sh after orchestrator completion
   --no-send           Only spawn sessions, do not send role prompts
   -h, --help          Show this help
@@ -36,6 +37,7 @@ SCOPE=""
 PROJECT_ID="AI-Assisted"
 AGENT_NAME="codex"
 FOLLOWUP_BUGS=0
+ALLOW_PUSH=0
 NO_SEND=0
 
 while [[ $# -gt 0 ]]; do
@@ -54,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --followup-bugs)
       FOLLOWUP_BUGS=1
+      shift
+      ;;
+    --allow-push)
+      ALLOW_PUSH=1
       shift
       ;;
     --no-send)
@@ -306,13 +312,23 @@ build_prompt_file() {
   local role="$1"
   local file="$PROMPT_DIR/${role}.md"
   local role_upper
+  local push_policy_line
+  local push_policy_note
   role_upper="$(echo "$role" | tr '[:lower:]' '[:upper:]')"
+
+  if [[ "$ALLOW_PUSH" -eq 1 ]]; then
+    push_policy_line="- PUSH_ALLOWED: git push and PR actions are allowed for this AO run when needed by role/task."
+    push_policy_note="- Push/PR is enabled for this run. Only push branches relevant to this scope."
+  else
+    push_policy_line="- NO_PUSH: do not run git push."
+    push_policy_note="- Push/PR is disabled for this run."
+  fi
 
   cat > "$file" <<PROMPT
 You are the ${role_upper} agent for scope '${SCOPE}' in a .NET 10 repository.
 
 Hard constraints:
-- NO_PUSH: do not run git push.
+${push_policy_line}
 - INFRA_FREEZE: do not modify Terraform/Bicep files.
 - Keep changes in feature scope.
 
@@ -331,6 +347,7 @@ $(action_block_for_role "$role" | sed 's/^/  /')
 Important:
 - Use explicit shell commands; do not only describe intent.
 - If a command fails, include failure + fix attempt in your outbox report.
+${push_policy_note}
 - Write both outputs:
   1) Human summary markdown (.md)
   2) Machine-readable JSON (.json) with this schema:
@@ -394,6 +411,7 @@ echo "Starting AO multi-agent run"
 echo "Scope: ${SCOPE}"
 echo "Project: ${PROJECT_ID}"
 echo "Agent: ${AGENT_NAME}"
+echo "Allow push/PR: ${ALLOW_PUSH}"
 echo "Follow-up bugs: ${FOLLOWUP_BUGS}"
 echo "Sync dir: ${SYNC_DIR}"
 echo
