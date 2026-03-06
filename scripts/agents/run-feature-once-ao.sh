@@ -10,6 +10,7 @@ Options:
   --project <id>      AO project id from agent-orchestrator.yaml (default: AI-Assisted)
   --agent <name>      Agent plugin override for ao spawn (default: codex)
   --followup-bugs     Run create-followup-bugs.sh after orchestrator completion
+  --pr-flow-readiness Run AO PR-flow readiness preflight before spawning sessions
   --no-send           Only spawn sessions, do not send role prompts
   -h, --help          Show this help
 
@@ -36,6 +37,7 @@ SCOPE=""
 PROJECT_ID="AI-Assisted"
 AGENT_NAME="codex"
 FOLLOWUP_BUGS=0
+PR_FLOW_READINESS=0
 NO_SEND=0
 
 while [[ $# -gt 0 ]]; do
@@ -54,6 +56,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --followup-bugs)
       FOLLOWUP_BUGS=1
+      shift
+      ;;
+    --pr-flow-readiness)
+      PR_FLOW_READINESS=1
       shift
       ;;
     --no-send)
@@ -88,6 +94,12 @@ SYNC_DIR="/tmp/multi-agent-sync/${SCOPE}"
 PROMPT_DIR="${SYNC_DIR}/prompts-ao"
 SESSION_MAP="${SYNC_DIR}/state/ao-sessions.map"
 ATTACH_MAP="${SYNC_DIR}/state/ao-attach.map"
+
+if [[ "$PR_FLOW_READINESS" -eq 1 ]]; then
+  "${ROOT}/scripts/agents/check-ao-pr-flow-readiness.sh" \
+    --project "${PROJECT_ID}" \
+    --smoke
+fi
 
 for required in \
   "${SYNC_DIR}/context.md" \
@@ -395,6 +407,7 @@ echo "Scope: ${SCOPE}"
 echo "Project: ${PROJECT_ID}"
 echo "Agent: ${AGENT_NAME}"
 echo "Follow-up bugs: ${FOLLOWUP_BUGS}"
+echo "PR-flow readiness gate: ${PR_FLOW_READINESS}"
 echo "Sync dir: ${SYNC_DIR}"
 echo
 

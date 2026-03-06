@@ -76,6 +76,27 @@ ao start
 ./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
 ```
 
+AO PR-flow readiness preflight (recommended before first run in a new environment):
+```bash
+./scripts/agents/check-ao-pr-flow-readiness.sh --smoke
+```
+- Required auth/env:
+  - `gh auth login` completed (`gh auth status` passes)
+  - `LINEAR_API_KEY` or `COMPOSIO_API_KEY` exported for Linear tracker path
+- Required AO YAML fields:
+  - `defaults.agent`
+  - `projects.<id>.repo`
+  - `projects.<id>.path`
+  - `projects.<id>.defaultBranch`
+  - `projects.<id>.tracker.plugin` (`github|linear|composio`)
+
+You can enforce this preflight as a fail-fast gate when running AO sessions:
+```bash
+./scripts/agents/run-feature-once-ao.sh \
+  --scope <feature-scope-id> \
+  --pr-flow-readiness
+```
+
 Optional: include automatic backlog follow-up bug generation:
 ```bash
 ./scripts/agents/run-feature-once-ao.sh \
