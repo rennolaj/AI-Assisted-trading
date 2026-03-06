@@ -40,6 +40,8 @@ Prerequisites:
 - `agent-orchestrator.yaml` in repo root
 - `defaults.agent: codex` in `agent-orchestrator.yaml`
 - `tmux` installed
+- For GitHub tracker projects: GitHub CLI authenticated (`gh auth status`)
+- For Linear tracker projects: `LINEAR_API_KEY` or `COMPOSIO_API_KEY` set
 
 Minimal AO config for this repo (already supported):
 ```yaml
@@ -75,6 +77,7 @@ ao start
 ```bash
 ./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
 ```
+The script runs readiness preflight checks and fails fast when required AO config or tracker auth is missing.
 
 Optional: include automatic backlog follow-up bug generation:
 ```bash
@@ -87,6 +90,24 @@ Optional: include automatic backlog follow-up bug generation:
 ```bash
 ao status
 ao session ls
+```
+
+PR flow smoke test (readiness):
+1. Verify auth and config:
+```bash
+gh auth status
+test -n "$LINEAR_API_KEY" || test -n "$COMPOSIO_API_KEY" || true
+```
+2. Bootstrap + AO run for a test scope:
+```bash
+./scripts/agents/bootstrap-feature.sh --scope ao-pr-smoke --base main
+./scripts/agents/run-feature-once-ao.sh --scope ao-pr-smoke
+```
+3. Confirm AO sessions spawn and role gates complete:
+```bash
+ao status
+ls -1 /tmp/multi-agent-sync/ao-pr-smoke/state
+ls -1 /tmp/multi-agent-sync/ao-pr-smoke/outbox
 ```
 
 5. Attach to sessions:

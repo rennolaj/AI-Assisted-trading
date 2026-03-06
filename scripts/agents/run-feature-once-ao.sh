@@ -28,6 +28,119 @@ require_cmd() {
   }
 }
 
+trim_value() {
+  local value="$1"
+  value="$(echo "$value" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+  value="${value%\"}"
+  value="${value#\"}"
+  value="${value%\'}"
+  value="${value#\'}"
+  echo "$value"
+}
+
+extract_project_block() {
+  local config_file="$1"
+  local project_id="$2"
+  awk -v project="$project_id" '
+    /^projects:[[:space:]]*$/ { in_projects=1; next }
+    in_projects && /^[^[:space:]]/ { in_projects=0 }
+    in_projects && $0 ~ ("^[[:space:]]{2}" project ":[[:space:]]*$") { in_project=1; print; next }
+    in_projects && in_project && $0 ~ /^[[:space:]]{2}[[:alnum:]_.-]+:[[:space:]]*$/ { in_project=0 }
+    in_project { print }
+  ' "$config_file"
+}
+
+get_tracker_plugin() {
+  local project_block="$1"
+  echo "$project_block" | awk '
+    /^[[:space:]]{4}tracker:[[:space:]]*$/ { in_tracker=1; next }
+    in_tracker && /^[[:space:]]{4}[[:alnum:]_.-]+:[[:space:]]*$/ { in_tracker=0 }
+    in_tracker && /^[[:space:]]{6}plugin:[[:space:]]*/ {
+      sub(/^[[:space:]]{6}plugin:[[:space:]]*/, "", $0)
+      print
+      exit
+    }
+  '
+}
+
+require_pattern_or_fail() {
+  local text="$1"
+  local pattern="$2"
+  local message="$3"
+  if ! echo "$text" | grep -Eq "$pattern"; then
+    echo "Readiness check failed: $message" >&2
+    exit 1
+  fi
+}
+
+run_readiness_preflight() {
+  local config_file="$1"
+  local project_id="$2"
+
+  if [[ ! -f "$config_file" ]]; then
+    echo "Readiness check failed: missing ${config_file}" >&2
+    exit 1
+  fi
+
+  local defaults_block
+  defaults_block="$(awk '
+    /^defaults:[[:space:]]*$/ { in_defaults=1; print; next }
+    in_defaults && /^[^[:space:]]/ { in_defaults=0 }
+    in_defaults { print }
+  ' "$config_file")"
+  require_pattern_or_fail "$defaults_block" '^[[:space:]]{2}agent:[[:space:]]*[^[:space:]].*$' \
+    "agent-orchestrator.yaml defaults.agent is required"
+
+  local project_block
+  project_block="$(extract_project_block "$config_file" "$project_id")"
+  if [[ -z "$project_block" ]]; then
+    echo "Readiness check failed: project '${project_id}' not found in ${config_file}" >&2
+    exit 1
+  fi
+
+  require_pattern_or_fail "$project_block" '^[[:space:]]{4}repo:[[:space:]]*[^[:space:]].*$' \
+    "project '${project_id}' is missing repo"
+  require_pattern_or_fail "$project_block" '^[[:space:]]{4}path:[[:space:]]*[^[:space:]].*$' \
+    "project '${project_id}' is missing path"
+  require_pattern_or_fail "$project_block" '^[[:space:]]{4}defaultBranch:[[:space:]]*[^[:space:]].*$' \
+    "project '${project_id}' is missing defaultBranch"
+  require_pattern_or_fail "$project_block" '^[[:space:]]{4}tracker:[[:space:]]*$' \
+    "project '${project_id}' is missing tracker block"
+
+  local tracker_plugin
+  tracker_plugin="$(get_tracker_plugin "$project_block")"
+  tracker_plugin="$(trim_value "$tracker_plugin")"
+  if [[ -z "$tracker_plugin" ]]; then
+    echo "Readiness check failed: project '${project_id}' tracker.plugin is required" >&2
+    exit 1
+  fi
+
+  case "$tracker_plugin" in
+    github)
+      require_cmd gh
+      if ! gh auth status >/dev/null 2>&1; then
+        echo "Readiness check failed: GitHub tracker requires 'gh auth status' to pass" >&2
+        echo "Run: gh auth login" >&2
+        exit 1
+      fi
+      if [[ -z "${LINEAR_API_KEY:-}" && -z "${COMPOSIO_API_KEY:-}" ]]; then
+        echo "Readiness note: Linear is not configured. For Linear tracker readiness, set LINEAR_API_KEY or COMPOSIO_API_KEY." >&2
+      fi
+      ;;
+    linear)
+      if [[ -z "${LINEAR_API_KEY:-}" && -z "${COMPOSIO_API_KEY:-}" ]]; then
+        echo "Readiness check failed: Linear tracker requires LINEAR_API_KEY or COMPOSIO_API_KEY" >&2
+        exit 1
+      fi
+      ;;
+    *)
+      echo "Readiness note: tracker.plugin '${tracker_plugin}' is not validated by this script." >&2
+      ;;
+  esac
+
+  echo "Readiness preflight passed for project '${project_id}' (tracker: ${tracker_plugin})"
+}
+
 sanitize_scope() {
   echo "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's#[^a-z0-9._-]+#-#g; s#^-+##; s#-+$##'
 }
@@ -83,11 +196,14 @@ require_cmd git
 
 ROOT="$(git rev-parse --show-toplevel)"
 PROJECT_BASENAME="$(basename "$ROOT")"
+AO_CONFIG_FILE="${ROOT}/agent-orchestrator.yaml"
 SCOPE="$(sanitize_scope "$SCOPE")"
 SYNC_DIR="/tmp/multi-agent-sync/${SCOPE}"
 PROMPT_DIR="${SYNC_DIR}/prompts-ao"
 SESSION_MAP="${SYNC_DIR}/state/ao-sessions.map"
 ATTACH_MAP="${SYNC_DIR}/state/ao-attach.map"
+
+run_readiness_preflight "$AO_CONFIG_FILE" "$PROJECT_ID"
 
 for required in \
   "${SYNC_DIR}/context.md" \
