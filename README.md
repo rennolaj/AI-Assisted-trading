@@ -37,9 +37,11 @@ Use this path when you want AO-managed sessions, dashboard visibility, and `ao` 
 
 Prerequisites:
 - AO CLI installed and available as `ao`
+- GitHub CLI installed and authenticated (`gh auth status`)
 - `agent-orchestrator.yaml` in repo root
 - `defaults.agent: codex` in `agent-orchestrator.yaml`
 - `tmux` installed
+- If `tracker.plugin=linear`, set one of: `LINEAR_API_KEY` or `COMPOSIO_API_KEY`
 
 Minimal AO config for this repo (already supported):
 ```yaml
@@ -74,6 +76,11 @@ ao start
 3. Run AO-based multi-agent pass:
 ```bash
 ./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
+```
+
+Readiness preflight only (no sessions spawned):
+```bash
+./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id> --readiness-only
 ```
 
 Optional: include automatic backlog follow-up bug generation:

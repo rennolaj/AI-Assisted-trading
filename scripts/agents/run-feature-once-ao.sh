@@ -10,6 +10,8 @@ Options:
   --project <id>      AO project id from agent-orchestrator.yaml (default: AI-Assisted)
   --agent <name>      Agent plugin override for ao spawn (default: codex)
   --followup-bugs     Run create-followup-bugs.sh after orchestrator completion
+  --readiness-only    Validate AO + PR/tracker readiness and exit
+  --skip-readiness    Skip readiness preflight checks
   --no-send           Only spawn sessions, do not send role prompts
   -h, --help          Show this help
 
@@ -36,6 +38,8 @@ SCOPE=""
 PROJECT_ID="AI-Assisted"
 AGENT_NAME="codex"
 FOLLOWUP_BUGS=0
+READINESS_ONLY=0
+SKIP_READINESS=0
 NO_SEND=0
 
 while [[ $# -gt 0 ]]; do
@@ -54,6 +58,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --followup-bugs)
       FOLLOWUP_BUGS=1
+      shift
+      ;;
+    --readiness-only)
+      READINESS_ONLY=1
+      shift
+      ;;
+    --skip-readiness)
+      SKIP_READINESS=1
       shift
       ;;
     --no-send)
@@ -88,6 +100,91 @@ SYNC_DIR="/tmp/multi-agent-sync/${SCOPE}"
 PROMPT_DIR="${SYNC_DIR}/prompts-ao"
 SESSION_MAP="${SYNC_DIR}/state/ao-sessions.map"
 ATTACH_MAP="${SYNC_DIR}/state/ao-attach.map"
+
+tracker_plugin_for_project() {
+  local config_file="${ROOT}/agent-orchestrator.yaml"
+  if [[ ! -f "$config_file" ]]; then
+    return 1
+  fi
+
+  awk -v project="$PROJECT_ID" '
+    /^projects:/ { in_projects=1; next }
+    in_projects && /^[^[:space:]]/ && $0 !~ /^projects:/ { in_projects=0 }
+    in_projects && $0 ~ "^[[:space:]]{2}" project ":[[:space:]]*$" { in_project=1; in_tracker=0; next }
+    in_project && $0 ~ "^[[:space:]]{2}[A-Za-z0-9_-]+:[[:space:]]*$" && $0 !~ "^[[:space:]]{2}" project ":[[:space:]]*$" { in_project=0; in_tracker=0 }
+    in_project && $0 ~ "^[[:space:]]{4}tracker:[[:space:]]*$" { in_tracker=1; next }
+    in_tracker && $0 ~ "^[[:space:]]{6}plugin:[[:space:]]*" {
+      sub(/^.*plugin:[[:space:]]*/, "")
+      gsub(/[[:space:]]/, "")
+      print
+      exit
+    }
+  ' "$config_file"
+}
+
+run_readiness_checks() {
+  local failures=0
+  local tracker_plugin=""
+
+  echo "Running readiness checks for project '${PROJECT_ID}'"
+
+  if command -v gh >/dev/null 2>&1; then
+    if gh auth status >/dev/null 2>&1; then
+      echo "  [PASS] GitHub CLI authentication is valid (gh auth status)."
+    else
+      echo "  [FAIL] GitHub CLI authentication is not ready. Run: gh auth login" >&2
+      failures=$((failures + 1))
+    fi
+  else
+    echo "  [FAIL] Missing required command: gh" >&2
+    failures=$((failures + 1))
+  fi
+
+  if git remote get-url origin >/dev/null 2>&1; then
+    echo "  [PASS] Git remote 'origin' is configured."
+  else
+    echo "  [FAIL] Git remote 'origin' is missing. Configure the repository remote first." >&2
+    failures=$((failures + 1))
+  fi
+
+  tracker_plugin="$(tracker_plugin_for_project || true)"
+  if [[ -n "$tracker_plugin" ]]; then
+    echo "  [PASS] Tracker plugin detected: ${tracker_plugin}"
+  else
+    echo "  [FAIL] Could not resolve tracker plugin for project '${PROJECT_ID}' from agent-orchestrator.yaml." >&2
+    failures=$((failures + 1))
+  fi
+
+  if [[ "$tracker_plugin" == "linear" ]]; then
+    if [[ -n "${LINEAR_API_KEY:-}" || -n "${COMPOSIO_API_KEY:-}" ]]; then
+      echo "  [PASS] Linear credentials found (LINEAR_API_KEY or COMPOSIO_API_KEY)."
+    else
+      echo "  [FAIL] Missing Linear credentials. Set LINEAR_API_KEY or COMPOSIO_API_KEY." >&2
+      failures=$((failures + 1))
+    fi
+  else
+    if [[ -n "${LINEAR_API_KEY:-}" || -n "${COMPOSIO_API_KEY:-}" ]]; then
+      echo "  [PASS] Optional Linear credentials are present."
+    else
+      echo "  [WARN] Linear credentials are not set. This is required only when tracker.plugin=linear."
+    fi
+  fi
+
+  if [[ "$failures" -gt 0 ]]; then
+    echo "Readiness check failed with ${failures} blocking issue(s)." >&2
+    return 1
+  fi
+
+  echo "Readiness check passed."
+}
+
+if [[ "$SKIP_READINESS" -eq 0 ]]; then
+  run_readiness_checks
+fi
+
+if [[ "$READINESS_ONLY" -eq 1 ]]; then
+  exit 0
+fi
 
 for required in \
   "${SYNC_DIR}/context.md" \
