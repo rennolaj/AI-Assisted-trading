@@ -12,9 +12,13 @@ This file defines the reusable local multi-agent workflow for this repository.
 - `integrator`: integration/dataflow verification.
 
 ## Global Policy
-- `NO_PUSH`: no `git push` by any agent.
+- `NO_PUSH`: no `git push` by agents participating in the coordinated sync-bus pass (`run-feature-once.sh` / `run-feature-once-ao.sh`).
 - `INFRA_FREEZE`: no Terraform/Bicep changes.
 - Keep changes inside feature scope.
+
+### AO issue-session policy
+- AO tracker-assigned issue sessions (outside the coordinated sync-bus pass) may use normal branch/push/PR workflow.
+- In those sessions, follow tracker/project rules (tests before push, conventional commits, issue-linked commits/PRs).
 
 ## Branch/Worktree Model
 - Branch naming per scope:

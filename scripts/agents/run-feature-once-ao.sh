@@ -18,6 +18,10 @@ This script creates one AO session per role:
 
 It then sends each role a gated instruction payload that uses the existing
 /tmp/multi-agent-sync/<scope> inbox/outbox/state contract.
+
+Important:
+  This coordinated role workflow is report-driven and intentionally non-pushing.
+  Do branch/push/PR work in AO tracker-assigned issue sessions, not here.
 USAGE
 }
 
@@ -312,7 +316,7 @@ build_prompt_file() {
 You are the ${role_upper} agent for scope '${SCOPE}' in a .NET 10 repository.
 
 Hard constraints:
-- NO_PUSH: do not run git push.
+- NO_PUSH (sync-bus run): do not run git push from this coordinated role session.
 - INFRA_FREEZE: do not modify Terraform/Bicep files.
 - Keep changes in feature scope.
 

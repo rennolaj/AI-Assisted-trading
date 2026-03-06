@@ -182,9 +182,10 @@ Backlog bug policy:
 ./scripts/agents/create-followup-bugs.sh --scope <feature-scope-id>
 ```
 
-### Policy constraints (always enforced)
-- `NO_PUSH`: no `git push`.
+### Policy constraints (coordinated sync-bus runs)
+- `NO_PUSH`: no `git push` for agents running under `run-feature-once.sh` or `run-feature-once-ao.sh`.
 - `INFRA_FREEZE`: no Terraform/Bicep modifications.
+- AO tracker-assigned issue sessions outside this coordinated flow use normal branch/push/PR lifecycle rules from AO project config.
 
 ## Quick start
 ```bash
