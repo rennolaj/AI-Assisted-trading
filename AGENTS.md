@@ -69,6 +69,7 @@ nano /tmp/multi-agent-sync/<feature-scope-id>/context.md
 ### 3A) Run one coordinated pass with AO sessions (recommended)
 ```bash
 ao start
+./scripts/agents/check-ao-pr-flow-readiness.sh --project AI-Assisted
 ./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
 ```
 
@@ -164,8 +165,12 @@ If automatic updates fail, you can manually update metadata:
 - Use `README.md` + this `AGENTS.md` as the source of truth.
 - Required files/scripts:
   - `scripts/agents/bootstrap-feature.sh`
+  - `scripts/agents/check-ao-pr-flow-readiness.sh`
   - `scripts/agents/run-feature-once-ao.sh`
   - `scripts/agents/create-followup-bugs.sh` (optional via `--followup-bugs`)
 - Required AO config:
   - `defaults.agent: codex`
   - project `AI-Assisted` present in `agent-orchestrator.yaml`
+- Required auth/env:
+  - `gh auth status` succeeds
+  - `LINEAR_API_KEY` or `COMPOSIO_API_KEY` is set

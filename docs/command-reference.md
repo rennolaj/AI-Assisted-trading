@@ -99,6 +99,32 @@ ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Mvp.Trading.Api/Mvp.
 
 ---
 
+## Multi-Agent (AO)
+
+```bash
+# Start AO
+ao start
+
+# Validate AO + PR flow readiness (YAML/auth/env fail-fast checks)
+./scripts/agents/check-ao-pr-flow-readiness.sh --project AI-Assisted
+
+# Bootstrap worktrees + sync contract
+./scripts/agents/bootstrap-feature.sh --scope <feature-scope-id> --base main --with-tmux --force
+
+# Run one AO coordinated pass
+./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
+
+# Optional: bypass preflight (not recommended)
+./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id> --skip-readiness-check
+
+# Inspect outcomes
+ao status
+ao session ls
+cat /tmp/multi-agent-sync/<feature-scope-id>/outbox/orchestrator.md
+```
+
+---
+
 ## Docker Operations
 
 ### Starting Services

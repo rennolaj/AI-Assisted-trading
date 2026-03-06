@@ -11,6 +11,7 @@ Options:
   --agent <name>      Agent plugin override for ao spawn (default: codex)
   --followup-bugs     Run create-followup-bugs.sh after orchestrator completion
   --no-send           Only spawn sessions, do not send role prompts
+  --skip-readiness-check  Skip AO/GitHub/Linear preflight validation
   -h, --help          Show this help
 
 This script creates one AO session per role:
@@ -37,6 +38,7 @@ PROJECT_ID="AI-Assisted"
 AGENT_NAME="codex"
 FOLLOWUP_BUGS=0
 NO_SEND=0
+SKIP_READINESS_CHECK=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -58,6 +60,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-send)
       NO_SEND=1
+      shift
+      ;;
+    --skip-readiness-check)
+      SKIP_READINESS_CHECK=1
       shift
       ;;
     -h|--help)
@@ -88,6 +94,10 @@ SYNC_DIR="/tmp/multi-agent-sync/${SCOPE}"
 PROMPT_DIR="${SYNC_DIR}/prompts-ao"
 SESSION_MAP="${SYNC_DIR}/state/ao-sessions.map"
 ATTACH_MAP="${SYNC_DIR}/state/ao-attach.map"
+
+if [[ "$SKIP_READINESS_CHECK" -eq 0 ]]; then
+  "${ROOT}/scripts/agents/check-ao-pr-flow-readiness.sh" --project "$PROJECT_ID"
+fi
 
 for required in \
   "${SYNC_DIR}/context.md" \

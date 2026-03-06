@@ -11,6 +11,7 @@ This setup is fully generic and driven by two scripts:
 - `scripts/agents/bootstrap-feature.sh`
 - `scripts/agents/run-feature-once.sh`
 - `scripts/agents/run-feature-once-ao.sh`
+- `scripts/agents/check-ao-pr-flow-readiness.sh`
 - `scripts/agents/create-followup-bugs.sh`
 
 It runs agents in parallel with file-based communication and stage gates.
@@ -37,9 +38,11 @@ Use this path when you want AO-managed sessions, dashboard visibility, and `ao` 
 
 Prerequisites:
 - AO CLI installed and available as `ao`
+- GitHub CLI installed and authenticated (`gh auth status`)
 - `agent-orchestrator.yaml` in repo root
 - `defaults.agent: codex` in `agent-orchestrator.yaml`
 - `tmux` installed
+- `LINEAR_API_KEY` or `COMPOSIO_API_KEY` exported for Linear readiness checks
 
 Minimal AO config for this repo (already supported):
 ```yaml
@@ -64,14 +67,19 @@ Activation steps:
 ao start
 ```
 
-2. Bootstrap feature contract files/worktrees:
+2. Run fail-fast readiness checks:
+```bash
+./scripts/agents/check-ao-pr-flow-readiness.sh --project AI-Assisted
+```
+
+3. Bootstrap feature contract files/worktrees:
 ```bash
 ./scripts/agents/bootstrap-feature.sh \
   --scope <feature-scope-id> \
   --base main
 ```
 
-3. Run AO-based multi-agent pass:
+4. Run AO-based multi-agent pass:
 ```bash
 ./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
 ```
@@ -83,17 +91,22 @@ Optional: include automatic backlog follow-up bug generation:
   --followup-bugs
 ```
 
-4. Inspect/operate:
+5. Inspect/operate:
 ```bash
 ao status
 ao session ls
 ```
 
-5. Attach to sessions:
+6. Attach to sessions:
 - The AO runner prints all `tmux attach -t <name>` targets after spawning.
 - Orchestrator session is also available from `ao start` output.
 
-6. Cleanup:
+7. Validate final decision artifact:
+```bash
+cat /tmp/multi-agent-sync/<feature-scope-id>/outbox/orchestrator.md
+```
+
+8. Cleanup:
 ```bash
 ao session kill <session-id>
 # or stop everything:
