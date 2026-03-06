@@ -11,6 +11,7 @@ This setup is fully generic and driven by two scripts:
 - `scripts/agents/bootstrap-feature.sh`
 - `scripts/agents/run-feature-once.sh`
 - `scripts/agents/run-feature-once-ao.sh`
+- `scripts/agents/check-ao-pr-flow-readiness.sh`
 - `scripts/agents/create-followup-bugs.sh`
 
 It runs agents in parallel with file-based communication and stage gates.
@@ -81,6 +82,45 @@ Optional: include automatic backlog follow-up bug generation:
 ./scripts/agents/run-feature-once-ao.sh \
   --scope <feature-scope-id> \
   --followup-bugs
+```
+
+Preflight behavior:
+- `run-feature-once-ao.sh` now runs readiness checks before spawning sessions.
+- Use `--require-linear` to enforce Linear env checks (`LINEAR_API_KEY` or `COMPOSIO_API_KEY`).
+- Use `--no-preflight` only when intentionally bypassing checks.
+
+Manual readiness check:
+```bash
+./scripts/agents/check-ao-pr-flow-readiness.sh --project AI-Assisted
+./scripts/agents/check-ao-pr-flow-readiness.sh --project AI-Assisted --require-linear
+```
+
+AO + PR flow readiness checklist:
+- `agent-orchestrator.yaml` contains:
+  - `defaults.agent`
+  - `projects.<project>.repo`
+  - `projects.<project>.path`
+  - `projects.<project>.defaultBranch`
+  - `projects.<project>.tracker.plugin` (`github` or `linear`)
+- `gh auth status` succeeds.
+- For Linear path, either `LINEAR_API_KEY` or `COMPOSIO_API_KEY` is set.
+- Feature scope has been bootstrapped (`/tmp/multi-agent-sync/<scope>/...` files exist).
+
+PR flow smoke test (local + GitHub):
+```bash
+# 1) Validate readiness
+./scripts/agents/check-ao-pr-flow-readiness.sh --project AI-Assisted
+
+# 2) Run AO pass
+./scripts/agents/bootstrap-feature.sh --scope <scope> --base main
+./scripts/agents/run-feature-once-ao.sh --scope <scope>
+
+# 3) Validate git/PR path on your feature branch
+git checkout -b feat/<scope>
+./scripts/test.sh
+git commit -am "chore: validate ao pr flow readiness (#<issue>)"
+git push -u origin feat/<scope>
+gh pr create --fill
 ```
 
 4. Inspect/operate:

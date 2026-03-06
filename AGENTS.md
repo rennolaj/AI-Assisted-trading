@@ -165,6 +165,7 @@ If automatic updates fail, you can manually update metadata:
 - Required files/scripts:
   - `scripts/agents/bootstrap-feature.sh`
   - `scripts/agents/run-feature-once-ao.sh`
+  - `scripts/agents/check-ao-pr-flow-readiness.sh`
   - `scripts/agents/create-followup-bugs.sh` (optional via `--followup-bugs`)
 - Required AO config:
   - `defaults.agent: codex`

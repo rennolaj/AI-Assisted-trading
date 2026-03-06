@@ -9,6 +9,8 @@ Usage:
 Options:
   --project <id>      AO project id from agent-orchestrator.yaml (default: AI-Assisted)
   --agent <name>      Agent plugin override for ao spawn (default: codex)
+  --require-linear    Require Linear readiness checks (LINEAR_API_KEY or COMPOSIO_API_KEY)
+  --no-preflight      Skip AO/GitHub/tracker readiness preflight checks
   --followup-bugs     Run create-followup-bugs.sh after orchestrator completion
   --no-send           Only spawn sessions, do not send role prompts
   -h, --help          Show this help
@@ -37,6 +39,8 @@ PROJECT_ID="AI-Assisted"
 AGENT_NAME="codex"
 FOLLOWUP_BUGS=0
 NO_SEND=0
+REQUIRE_LINEAR=0
+PREFLIGHT=1
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -51,6 +55,14 @@ while [[ $# -gt 0 ]]; do
     --agent)
       AGENT_NAME="${2:-}"
       shift 2
+      ;;
+    --require-linear)
+      REQUIRE_LINEAR=1
+      shift
+      ;;
+    --no-preflight)
+      PREFLIGHT=0
+      shift
       ;;
     --followup-bugs)
       FOLLOWUP_BUGS=1
@@ -88,6 +100,14 @@ SYNC_DIR="/tmp/multi-agent-sync/${SCOPE}"
 PROMPT_DIR="${SYNC_DIR}/prompts-ao"
 SESSION_MAP="${SYNC_DIR}/state/ao-sessions.map"
 ATTACH_MAP="${SYNC_DIR}/state/ao-attach.map"
+
+if [[ "$PREFLIGHT" -eq 1 ]]; then
+  PREFLIGHT_CMD=( "${ROOT}/scripts/agents/check-ao-pr-flow-readiness.sh" --project "${PROJECT_ID}" )
+  if [[ "$REQUIRE_LINEAR" -eq 1 ]]; then
+    PREFLIGHT_CMD+=( --require-linear )
+  fi
+  "${PREFLIGHT_CMD[@]}"
+fi
 
 for required in \
   "${SYNC_DIR}/context.md" \
