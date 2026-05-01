@@ -1,0 +1,34 @@
+dataDir: ~/.agent-orchestrator
+worktreeDir: ~/.worktrees
+port: 3001
+defaults:
+  runtime: copilot-cli
+  agent: claude
+  workspace: main
+  notifiers:
+    - desktop
+projects:
+  AI-Assisted:
+    name: AI-Assisted
+    sessionPrefix: aia-claude
+    repo: rennolaj/AI-Assisted-trading
+    path: /Users/jrennola/Hobby/AI-Assisted
+    defaultBranch: main
+    tracker:
+      plugin: github
+    skillFile: docs/csharp-dotnet10-skill.md
+    contractFile: CLAUDE.md
+    agentRules: |-
+      Always read CLAUDE.md and docs/csharp-dotnet10-skill.md before writing any code.
+      Never introduce M14 anti-patterns (see CLAUDE.md for full list).
+      Always run tests before marking work done: ./scripts/test.sh
+      Use conventional commits (feat:, fix:, chore:, docs:, refactor:, test:).
+      Link issue/story numbers in commit messages.
+      Write commit messages that explain WHY, not just WHAT.
+      Never git push — the human decides when to push.
+      Never modify Terraform or Bicep files (INFRA_FREEZE).
+      Always return Result<T> at service boundaries — never throw across layers.
+      Always propagate CancellationToken to all async calls.
+      Never use DateTime.UtcNow directly — inject TimeProvider.
+      Always use ValidateOnStart() on IOptions<T> bindings.
+      Mark implementation types internal unless in Contracts project.

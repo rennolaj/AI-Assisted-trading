@@ -176,8 +176,7 @@ action_block_for_role() {
   case "$role" in
     planner)
       cat <<'ACT'
-1) Checkout role branch:
-   git checkout -B "agent/planner/<scope>"
+1) You are already on the feature branch for this scope. Confirm with: git branch --show-current
 2) Read:
    - context.md
    - inbox/planner.md
@@ -189,8 +188,7 @@ ACT
       ;;
     builder)
       cat <<'ACT'
-1) Checkout role branch:
-   git checkout -B "agent/builder/<scope>"
+1) You are already on the feature branch for this scope. Confirm with: git branch --show-current
 2) Read:
    - context.md
    - inbox/builder.md
@@ -200,23 +198,27 @@ ACT
    ./scripts/restore.sh
    ./scripts/build.sh
    ./scripts/test.sh
-5) Write report to outbox/builder.md with:
+5) Commit all changes to the feature branch:
+   git add -A && git commit -m "feat(<scope>): <summary>"
+6) Save diff artifact for downstream review:
+   git diff main..HEAD > /tmp/multi-agent-sync/<scope>/outbox/builder.diff
+7) Write report to outbox/builder.md with:
    - Summary
    - Files changed
    - Commands + results
    - Risks / follow-ups
-6) Also write machine-readable report to outbox/builder.json.
-7) Mark done by creating state/builder.done
+8) Also write machine-readable report to outbox/builder.json.
+9) Mark done by creating state/builder.done
 ACT
       ;;
     reviewer)
       cat <<'ACT'
-1) Checkout role branch:
-   git checkout -B "agent/reviewer/<scope>"
+1) You are already on the feature branch. Do NOT make any commits.
 2) Read:
    - context.md
    - inbox/reviewer.md
    - outbox/builder.md
+   - outbox/builder.diff   ← use this for all file-level review; do not switch branches
 3) Perform code review with severity and file references.
 4) Write report to outbox/reviewer.md.
 5) Also write machine-readable report to outbox/reviewer.json.
@@ -225,12 +227,12 @@ ACT
       ;;
     quality)
       cat <<'ACT'
-1) Checkout role branch:
-   git checkout -B "agent/quality/<scope>"
+1) You are already on the feature branch. Do NOT make any commits.
 2) Read:
    - context.md
    - inbox/quality.md
    - outbox/builder.md
+   - outbox/builder.diff   ← use this for all file-level quality checks
 3) Run quality checks relevant to .NET 10 codebase.
 4) Write report to outbox/quality.md including QUALITY_STATUS and actionable items.
 5) Also write machine-readable report to outbox/quality.json.
@@ -239,8 +241,7 @@ ACT
       ;;
     tester)
       cat <<'ACT'
-1) Checkout role branch:
-   git checkout -B "agent/tester/<scope>"
+1) You are already on the feature branch. Do NOT make any commits.
 2) Read:
    - context.md
    - inbox/tester.md
@@ -257,12 +258,12 @@ ACT
       ;;
     integrator)
       cat <<'ACT'
-1) Checkout role branch:
-   git checkout -B "agent/integrator/<scope>"
+1) You are already on the feature branch. Do NOT make any commits.
 2) Read:
    - context.md
    - inbox/integrator.md
    - outbox/tester.md
+   - outbox/builder.diff   ← use this for integration/dataflow impact assessment
 3) Validate integration/dataflow and cross-component impacts.
 4) Write report to outbox/integrator.md.
 5) Also write machine-readable report to outbox/integrator.json.

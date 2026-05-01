@@ -17,15 +17,14 @@ This file defines the reusable local multi-agent workflow for this repository.
 - Keep changes inside feature scope.
 
 ## Branch/Worktree Model
-- Branch naming per scope:
-  - `agent/planner/<scope>`
-  - `agent/builder/<scope>`
-  - `agent/reviewer/<scope>`
-  - `agent/quality/<scope>`
-  - `agent/tester/<scope>`
-  - `agent/integrator/<scope>`
-- Each agent runs in its own worktree.
-- Orchestrator runs on `main` worktree.
+- **One branch per feature scope**: `feature/<scope>` — branched from `main`.
+- **All agents work on the same branch** — no per-role branches.
+- Orchestrator coordinates from the `main` worktree.
+- Only the **builder** makes commits.
+- After committing, the builder saves a diff artifact:
+  - `git diff main..HEAD > /tmp/multi-agent-sync/<scope>/outbox/builder.diff`
+- All downstream agents (reviewer, quality, tester, integrator) read `outbox/builder.diff`
+  — they never switch branches or check out their own copy.
 
 ## Shared Handoff Bus
 Per scope, all handoffs are in:

@@ -225,6 +225,34 @@
 **Status**: Backlog - user request for dollar-cost averaging / scale-in feature
 **Rationale**: Improves average entry price if initial entry is premature; reduces impact of timing risk; common in professional trading to scale into positions
 
+### M12 - Agent Orchestration Alignment (NEW - CRITICAL)
+**Goal**: align orchestration behavior with deterministic multi-agent best practices and reduce token waste.
+- Story M12.1 (P0): Enforce `agent-stuck.threshold` in lifecycle transitions
+  - Use configured threshold to transition sessions to `stuck`
+  - Trigger configured reaction once threshold is exceeded
+  - Add tests covering threshold-based transition behavior
+- Story M12.2 (P0): Add LLM budget controls (`max_tokens`, `max_steps`, `max_retries`)
+  - Extend config schema with per-agent and per-session budget settings
+  - Enforce budget limits during execution
+  - Define fallback behavior (`needs_input`, stop, or configurable action)
+- Story M12.3 (P0): Add structured outbox contract for role handoffs
+  - Define JSON schema for role outputs
+  - Validate outputs before routing to next stage
+  - Fail fast with actionable error messages on schema mismatch
+- Story M12.4 (P0): Add deterministic staged pipeline mode
+  - Support Planner -> Implementer -> Reviewer -> Tester stage order
+  - Add stage gating, retries, and fail-fast/continue policy
+  - Expose as `ao run-pipeline` (or equivalent)
+- Story M12.5 (P1): Add shared task-state model for multi-stage runs
+  - Persist `goal`, `plan`, `current_step`, `decisions`, `constraints`, `modified_files`
+  - Provide filtered state views per stage/role
+- Story M12.6 (P1): Add progressive context expansion
+  - Start each stage with minimal context bundle
+  - Allow explicit context expansion requests and track decisions
+  - Prefer snippets/diffs/artifacts over full-file context
+**Done when**: deterministic staged runs are supported, budget limits are enforceable, handoffs are schema-validated, stuck threshold is truly enforced, and context expansion is explicit and minimal.
+**Status**: Backlog
+
 ## Implementation Order (Suggested)
 - M0, M1, M2, M3, M4, M5, M6, M7, M8, M9
 
@@ -246,3 +274,548 @@
   - Source: /tmp/multi-agent-sync/m9-7-llm-adjudication-persistence-observability/outbox/quality.md
   - Trigger: QUALITY_STATUS: CHANGES_REQUIRED
   - Required action: Fix blocking findings before continuing feature delivery.
+
+### M13 - AO Integration Readiness: Linear + GitHub PR Flow (NEW - HIGH)
+**Goal**: guarantee that AO sessions can fetch Linear issues and reliably open/manage GitHub PRs.
+
+**Missing overview (current gaps to close):**
+- Config readiness checks are not enforced from project backlog/workflow:
+  - `projects.<id>.repo` must be valid `owner/repo`
+  - `projects.<id>.tracker.plugin` must be set correctly (`linear` when using Linear tickets)
+  - `projects.<id>.tracker.teamId` required for Linear list/create flows
+  - `projects.<id>.scm.plugin` should be explicitly set to `github` for clarity
+- Auth readiness is not tracked as a backlog gate:
+  - `gh auth status` must be valid for PR operations
+  - `LINEAR_API_KEY` (or `COMPOSIO_API_KEY`) must be present when tracker is Linear
+- No preflight command/checklist is documented in project-level runbook before `ao spawn`.
+- No explicit failure-mode checklist for common breakpoints (invalid repo slug, missing teamId, missing GH auth, missing Linear key).
+
+- Story M13.1: Add AO config contract section to project docs (required fields + valid examples)
+  - Include minimal YAML for GitHub+Linear project
+  - Include explicit `repo`, `scm`, `tracker`, `defaultBranch`, `sessionPrefix` expectations
+- Story M13.2: Add preflight checklist command block to docs
+  - `gh auth status`
+  - `echo $LINEAR_API_KEY` (or COMPOSIO alternative)
+  - `ao status` / `ao spawn <project> <ticket>` smoke test
+- Story M13.3: Add "PR flow readiness" acceptance test
+  - Spawn from a Linear ticket
+  - Verify branch creation, PR detection (`pr_open`), and CI/review polling via SCM plugin
+- Story M13.4: Add troubleshooting matrix for auth/config failures
+  - Map symptom -> likely root cause -> fix command
+- Story M13.5: Add optional strict validation task
+  - Fail fast in startup/preflight when tracker=linear and required env/config keys are missing
+
+**Done when**: one documented checklist validates Linear + GitHub PR path end-to-end, and failures are actionable before agents are spawned.
+**Status**: Backlog
+
+### M14 - Full Technical Review: C# .NET 10 Standards (NEW - HIGH)
+**Goal**: comprehensive technical review of the entire codebase against C# and .NET 10 best practices, identifying gaps, anti-patterns, and improvement opportunities with an actionable remediation plan per story.
+
+---
+
+#### M14.1 — Language and Compiler Modernization
+**Research status**: ✅ Complete | **Overall**: EXCELLENT — codebase ~95% modernized
+**Global baseline confirmed**: `net10.0`, `Nullable=enable`, `ImplicitUsings=enable`, SDK pinned `10.0.101`
+
+**Already compliant — no action needed:**
+- Pattern matching: 105 modern `is null` / `is not null` / switch expressions, zero old-style
+- Record DTOs: 81 sealed records — entire Contracts project is records
+- File-scoped namespaces: 149/150 files (100% modern)
+- LINQ: zero anti-patterns (`Where().Count()` etc.)
+- String interpolation: 93 interpolations, zero `string.Format()` calls
+- `var` usage: well-balanced throughout
+- Global usings: `ImplicitUsings` already covers System.* — no redundant blocks
+
+**Stories:**
+- Story M14.1.A: Convert 5+ assignment-only constructors to primary constructor syntax (C# 12)
+  - Targets: ExecutionService, TradePlanBuilder, ImpulseCandidateBuilder, InvalidationCalculator, IndicatorEngine
+  - Risk: LOW — purely syntactic, no behavior change | Effort: ~2h
+- Story M14.1.B: Convert 6 `new[] { }` array initializers to collection expressions `[ ]` (C# 12)
+  - Files: Program.cs, IndicatorDefaults.cs, ElliottEngine.cs, TradePlanBuilder.cs
+  - Risk: LOW | Effort: ~15min
+- Story M14.1.C: Remove 5 redundant null-forgiving operators (`!`)
+  - Files: KillSwitchService.cs (~lines 35, 47), IndicatorEngine.cs (~line 60) — redundant after `TryGetValue`/`is not null`
+  - Risk: LOW | Effort: ~30min
+- Story M14.1.F: Replace `Substring(0,N)` with range syntax `[..N]` in 3 files (optional)
+  - Files: LocalLlmMcpGateway.cs, WebhookHeaderSanitizer.cs, KrakenFuturesSymbolFormatter.cs
+  - Risk: LOW | Effort: ~15min
+- Story M14.1.J: Enable `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>` in Directory.Build.props
+  - Also evaluate removing `<NoWarn>1591</NoWarn>` in Mvp.Trading.Api.csproj
+  - Risk: MEDIUM — run full build first; may expose hidden warnings | Effort: ~2-4h
+
+**Done when**: all five stories applied, build passes clean with no warnings, TreatWarningsAsErrors active.
+**Status**: Backlog
+
+##### M14.1.X — C# 14 / .NET 10 Feature Adoption (concrete analysis complete)
+**Research status**: ✅ Complete — 14 features scanned, 4 applicable, 10 NOT_APPLICABLE (codebase already modern)
+
+**Features scanned and ruled NOT applicable** (no changes needed):
+- `field` keyword — no simple backing-field properties found
+- `nameof` with unbound generics — no generic type names in string literals
+- Null-conditional assignment `??=` — no suitable single-assignment null-guard patterns
+- `Task.WhenEach` — existing `Task.WhenAll` in IndicatorEngine collects all results before processing (correct)
+- `Base64Url` — only HMAC-SHA512 signing (not URL-safe encoding)
+- `SearchValues<T>` — no multi-char containment loops found
+- `CountBy`/`AggregateBy` LINQ — no GroupBy-ToDictionary patterns found
+- `Index()` LINQ — no `Select((item, i) => ...)` patterns found
+- `[OverloadResolutionPriority]` — no dual overload conflicts
+- `\e` escape sequence — no ANSI escape sequences in source
+
+**Stories:**
+- Story M14.1.X-1: Upgrade `object` lock fields to `System.Threading.Lock` (C# 13)
+  - `src/Mvp.Trading.Integrations.Kraken/KrakenFuturesRateLimitBudget.cs:10` — `private readonly object _gate = new();` → `private readonly Lock _gate = new();`
+  - `src/Mvp.Trading.Integrations.Kraken/FixtureMarketDataProvider.cs:303` — `private readonly object _sync = new();` → `private readonly Lock _sync = new();`
+  - Add `using System.Threading;` to both files. `lock` statement syntax is unchanged.
+  - Risk: LOW (1:1 syntactic replacement, no behavioral change) | Effort: ~15min
+
+- Story M14.1.X-2: Replace `Guid.NewGuid()` with `Guid.CreateVersion7()` for DB-persisted entity IDs (.NET 10)
+  - `src/Mvp.Trading.Api/Services/PostgresOpenTradeCommand.cs:36` — `tradeId` (persisted to `open_trades.trade_id`)
+  - `src/Mvp.Trading.Execution/PostgresOrderReceiptStore.cs:35` — `receipt_id` (persisted to `order_receipt.receipt_id`)
+  - `src/Mvp.Trading.Worker/AlertWorker.cs:467` — `AdjudicationId` (persisted to `llm_adjudication`)
+  - `src/Mvp.Trading.Api/Program.cs:214` — `AlertId` in AlertEvent (persisted to DB)
+  - **Do NOT change**: CorrelationId GUIDs (AlertWorker.cs:149, 215) — non-persisted, leave as `NewGuid()`
+  - Risk: MEDIUM — verify no existing queries depend on random GUID ordering; test DB index behaviour | Effort: ~30min + validation
+
+- Story M14.1.X-3: Replace manual list composition with collection expression spread (C# 12)
+  - `src/Mvp.Trading.Integrations.Kraken/FixtureMarketDataProvider.cs:232-235`
+  - Current: `new List<Candle>(lookbackBars); result.AddRange(prefix); result.AddRange(candles); return result;`
+  - Replace with: `return [..prefix, ..candles];`
+  - Risk: LOW (collection expression allocates exact size; no capacity hint needed) | Effort: ~5min
+
+- Story M14.1.X-4: Convert `params string[]` to `params ReadOnlySpan<string>` in JSON normalizer helpers (C# 13)
+  - `src/Mvp.Trading.Api/TradingViewNormalizer.cs:38` — `GetStringCaseInsensitive` method signature
+  - `src/Mvp.Trading.Api/TradingViewNormalizer.cs:62` — `TryGetNumberCaseInsensitive` method signature
+  - Both only iterate over params; no storage, mutation, or return of the array.
+  - Risk: MEDIUM — verify all callers compile after signature change; run webhook normalisation tests | Effort: ~30min
+
+**Done when**: all 4 stories complete, build passes, unit tests for TradingViewNormalizer green.
+**Status**: Backlog
+
+---
+
+#### M14.2 — .NET 10 Runtime and API Alignment
+**Research status**: ✅ Complete | **Overall**: GOOD with CRITICAL gaps
+
+**Per-project health:**
+| Project | Status | Key Gap | Effort |
+|---------|--------|---------|--------|
+| Mvp.Trading.Worker | NEEDS ATTENTION | `DateTime.UtcNow` (10+ files), no ShutdownTimeout, JsonOptions not cached | ~32h |
+| Mvp.Trading.Integrations.Kraken | NEEDS ATTENTION | No resilience policies, `DateTime.UtcNow` in rate limiter, HttpClient config in ctor | ~16h |
+| Mvp.Trading.Api | GOOD | `DateTime.UtcNow` (5 files), no `ValidateOnStart` | ~12h |
+| Mvp.Trading.Execution | GOOD | `DateTime.UtcNow` in KillSwitchService | ~8h |
+| Mvp.Trading.Risk | GOOD | JsonOptions not cached (3 files) | ~2h |
+| Mvp.Trading.Indicators | GOOD | None critical | ~2h |
+| Mvp.Trading.Elliott | EXCELLENT | None | 0h |
+| Mvp.Trading.Contracts | EXCELLENT | None (pure DTO lib) | 0h |
+
+**Already compliant — no action needed:**
+- IHttpClientFactory used correctly — no raw `new HttpClient()` anywhere
+- BackgroundService implementations correct (`ExecuteAsync` + `stoppingToken`)
+- Structured logging — no string interpolation defeating log properties
+- Minimal APIs with Swagger/OpenAPI in place
+- `IOptions<T>` pattern used throughout
+- No deprecated NuGet packages; OpenTelemetry instrumentation present
+- No service locator anti-patterns; no captive dependency lifetime mismatches
+
+**Phase 1 — MUST FIX (~54h total):**
+- Story M14.2.1 (CRITICAL): Inject `TimeProvider` abstraction — replace all `DateTimeOffset.UtcNow` / `DateTime.UtcNow`
+  - 40+ call sites across 12+ files: AlertWorker, KillSwitchService, KrakenFuturesMarketDataProvider (rate limiter), all Postgres store timestamp captures
+  - Register `TimeProvider.System` in DI; inject via constructor; use `timeProvider.GetUtcNow()`
+  - Create `FakeTimeProvider` tests using `Microsoft.Extensions.TimeProvider.Testing`
+  - Blocker: unlocks all time-dependent unit and integration testing | Risk: MEDIUM | Effort: ~40h
+- Story M14.2.2 (CRITICAL): Add `Microsoft.Extensions.Http.Resilience` to Kraken HTTP client
+  - Zero retry, circuit-breaker, or timeout policies on any Kraken API call — single transient failure = missed trade
+  - Add `AddStandardResilienceHandler()` in `Program.cs` `AddHttpClient<KrakenFuturesTradingProvider>`
+  - Configure: 3× retry with exponential backoff, 30s circuit-breaker, 10s per-attempt timeout
+  - Risk: LOW | Effort: ~8h
+- Story M14.2.3 (HIGH): Add `ValidateDataAnnotations().ValidateOnStart()` to all `IOptions<T>` bindings
+  - Missing validation means bad config fails at runtime during trade execution, not at startup
+  - Add `[Required]`, `[Range]`, `[Url]` to all `*Options` / `*Settings` classes; update all `services.Configure<T>()` in Program.cs
+  - Risk: LOW | Effort: ~6h
+
+**Phase 2 — SHOULD FIX (~18h total):**
+- Story M14.2.4 (HIGH): Configure `HostOptions.ShutdownTimeout = 30s` in Program.cs
+  - Default 5s is insufficient to drain Redis queue or complete in-flight orders
+  - `services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(30));`
+  - Risk: LOW | Effort: ~1h
+- Story M14.2.5 (MEDIUM): Cache `JsonSerializerOptions` as `static readonly` fields
+  - 11+ files instantiate `new JsonSerializerOptions { ... }` per call — micro-allocation on every alert
+  - Extract to `static readonly` singleton per usage context across Worker, Api, Integrations.Kraken, Risk
+  - Risk: LOW | Effort: ~8h
+- Story M14.2.6 (MEDIUM): Move Kraken `HttpClient` configuration from constructors to DI factory
+  - `BaseAddress`, `Timeout`, default headers set in constructor; should live in `AddHttpClient<T>()` in Program.cs
+  - Risk: LOW | Effort: ~6h
+
+**Phase 3 — NICE TO HAVE (~26h total):**
+- Story M14.2.7: Add `JsonSerializerContext` source generation for `AlertEvent`, `TradePlan`, `LlmDecision`, Kraken API models (~12h)
+- Story M14.2.8: Replace `_logger.LogInformation(...)` with `[LoggerMessage]` partial methods in worker hot paths (~6h)
+- Story M14.2.9: Introduce `Directory.Packages.props` — Central Package Management for all 8 projects (~4h)
+- Story M14.2.10: Convert Minimal API `Results.Ok(...)` → `TypedResults.Ok(...)` for AOT + OpenAPI correctness (~2h)
+
+**Total estimated effort: ~98h**
+**Done when**: TimeProvider injected everywhere; Kraken calls have resilience policies; bad config fails at startup; phases 1–3 complete and build + tests green.
+**Status**: Backlog
+
+---
+
+#### M14.3 — Dependency Injection and Configuration
+**Research status**: ✅ Complete | **Overall**: GOOD with targeted gaps
+
+**Already compliant — no action needed:**
+- Service lifetimes: all major singletons are stateless/long-lived — no captive dependency violations
+- No service locator anti-patterns (`IServiceProvider.GetService<T>()` at runtime)
+- Extension method organization: DI registrations split into logical groups per domain
+- `IOptions<T>` variant selection: correct variant used per injection site (no `IOptionsSnapshot<T>` in singletons)
+
+**Must Fix:**
+- Story M14.3.1 (HIGH): Add `[Required]` data annotations to all `*Options` / `*Settings` classes
+  - `PostgresOptions`, `RedisOptions`, `OpenAiOptions`, `LocalLlmOptions`, `KillSwitchApiOptions` have no validation attributes
+  - Prerequisite for `ValidateOnStart` — without annotations validation has nothing to check
+  - Risk: LOW | Effort: ~2h
+- Story M14.3.2 (HIGH): Add `.ValidateDataAnnotations().ValidateOnStart()` to all `Configure<T>()` calls
+  - Api/Program.cs (6 calls), Worker/Program.cs (3 calls) — none have `ValidateOnStart`
+  - Currently bad config (e.g. missing Redis connection string) fails on first trade, not at startup
+  - Risk: LOW | Effort: ~4h
+
+**Should Fix:**
+- Story M14.3.3 (MEDIUM): Extract 15+ config section name magic strings to `ConfigurationKeys` constants class
+  - Section names hardcoded across both Program.cs files — typos silently produce empty/null config
+  - Risk: LOW | Effort: ~3h
+- Story M14.3.4 (MEDIUM): Fix HttpClient + Singleton coupling for `KrakenFuturesMarketDataProvider`
+  - Registered as Singleton but uses `AddHttpClient<T>` typed client — defeats connection pooling semantics
+  - Fix: make it a properly configured typed client or adjust registration | Effort: ~2h
+
+**Done when**: all options classes annotated; `ValidateOnStart` active on all bindings; build and tests green.
+**Status**: Backlog
+
+---
+
+#### M14.4 — Async/Await and CancellationToken Correctness
+**Research status**: ✅ Complete | **Overall**: SIGNIFICANT GAPS — 5 must-fix issues on critical paths
+
+**Already correct — no action needed:**
+- KillSwitchService: correctly propagates ct through `OpenAsync` and `ExecuteScalarAsync`
+- KrakenFuturesTradingProvider: correctly passes ct to `HttpClient.SendAsync` and `ReadAsStringAsync`
+- AlertWorker.GetAdjudicationAsync: correctly propagates ct to MCP gateway
+- ElliottEngine.GenerateCandidatesAsync: correctly passes ct to market data calls
+
+**Must Fix (blocks production):**
+- Story M14.4.1 (CRITICAL): Fix CT not propagated in `ExecutionService.SendWithRetriesAsync`
+  - File: Mvp.Trading.Execution/ExecutionService.cs ~line 366
+  - `Func<Task<Result<OrderAck>>>` invoked as `await action()` — ct never forwarded
+  - Fix: change to `Func<CancellationToken, Task<Result<OrderAck>>>` and call `await action(ct)`
+  - Impact: order retry loop cannot be cancelled during shutdown | Risk: LOW | Effort: ~1h
+- Story M14.4.2 (HIGH): Fix CT ignored in `RedisAlertQueue.EnqueueAsync`
+  - File: Mvp.Trading.Api/Services/RedisAlertQueue.cs ~line 31
+  - `ListRightPushAsync` called without ct — Redis enqueue blocks graceful shutdown
+  - Risk: LOW | Effort: ~30min
+- Story M14.4.3 (HIGH): Fix CT ignored in `AlertWorker.DequeueAsync`
+  - File: Mvp.Trading.Worker/AlertWorker.cs ~lines 331-339
+  - Both `ListLengthAsync` and `ListLeftPopAsync` called without ct — queue reads block shutdown
+  - Risk: LOW | Effort: ~30min
+- Story M14.4.4 (HIGH): Standardize 14+ Postgres files from `CreateCommand` to `OpenConnectionAsync(ct)` pattern
+  - `NpgsqlDataSource.CreateCommand()` has no CT support — command creation is uncancellable
+  - Correct pattern already in PostgresReconciliationStore.SaveReconciliationAsync — standardize everywhere
+  - Affected: PostgresOpenTradeRepository, PostgresAlertProcessingStore, PostgresElliottCandidatesStore, PostgresIndicatorSnapshotStore, PostgresIdempotencyStore, PostgresAlertStore, PostgresOpenTradeCommand, PostgresElliottCandidatesQuery, PostgresAlertProcessingQuery, PostgresIndicatorSnapshotQuery, PostgresReconciliationStore, PostgresTradePlanStore, PostgresExecutionHeartbeatStore, PostgresOrderReceiptStore, PostgresLlmAdjudicationStore, PostgresExecutionIntentStore
+  - Risk: LOW | Effort: ~4h
+- Story M14.4.5 (HIGH): Fix CT not passed in `McpGatewayRouter.ExecuteWithDefaultAsync`
+  - File: Mvp.Trading.Api/Mcp/McpGatewayRouter.cs ~line 79
+  - Private method never receives or forwards ct → LLM/MCP calls are uncancellable
+  - Fix: add `CancellationToken ct` parameter and propagate to action invocation
+  - Risk: LOW | Effort: ~30min
+
+**Nice to Have:**
+- Story M14.4.6 (MEDIUM): Add `ConfigureAwait(false)` consistently to all awaits in library projects
+  - Libraries: Elliott, Indicators, Risk, Integrations.Kraken — should avoid capturing ASP.NET sync context
+  - Api and Worker projects are exempt
+  - Risk: LOW | Effort: ~3h
+
+**Done when**: CT-1 through CT-5 fixed, all Postgres stores use `OpenConnectionAsync(ct)`, build and tests green.
+**Status**: Backlog
+
+---
+
+#### M14.5 — Error Handling and Resilience
+**Research status**: ✅ Complete | **Overall**: CRITICAL — 4 fail-open financial risks identified
+
+**Already compliant — no action needed:**
+- Exception handling: disciplined throughout — `OperationCanceledException` separated and re-thrown correctly; all catch blocks log with context
+- `Result<T>` envelope: uniform usage across service boundaries; no raw exception returns at domain layer
+- Logging on failure: good coverage; correlation IDs included in error logs
+
+**Must Fix (financial loss risk):**
+- Story M14.5.1 (CRITICAL): Fix `KillSwitchService` fails-open on DB unreachable
+  - File: Mvp.Trading.Execution/KillSwitchService.cs ~lines 42-81
+  - If DB unreachable + cache miss → returns inactive kill switch → trades execute without safety check
+  - Fix: return `KillSwitchStatus(active: true, level: EMERGENCY_STOP)` on any DB failure
+  - Risk: HIGH — financial loss | Effort: ~1-2h
+- Story M14.5.2 (CRITICAL): Fix webhook returning 202 when Redis enqueue fails
+  - File: Mvp.Trading.Api/Services/RedisAlertQueue.cs ~line 31
+  - Redis unavailable → alert silently dropped but caller receives 202 Accepted
+  - Fix: add Polly retry; return 503 if all retries exhausted | Effort: ~3-4h
+- Story M14.5.3 (CRITICAL): Fix DB persistence failures proceeding silently in worker
+  - Files: PostgresAlertStore, PostgresLlmAdjudicationStore — INSERT failure throws but worker marks as processed
+  - Fix: wrap in try-catch; return `Result<bool>`; do not mark processed on failure | Effort: ~2-3h
+- Story M14.5.4 (CRITICAL): Replace per-process Kraken rate limit budget with distributed (Redis-backed)
+  - File: Mvp.Trading.Integrations.Kraken/KrakenFuturesRateLimitBudget.cs ~lines 21-45
+  - Per-process counter only — multi-instance deployments silently exceed Kraken API limits
+  - Fix: Redis `INCR` + `EXPIRE` counter or enforce single-instance constraint | Effort: ~4-5h
+- Story M14.5.5 (CRITICAL): Add HTTP resilience policies to all HTTP clients
+  - Zero Polly/resilience policies on OpenAI, LocalLLM, Kraken clients — transient 5xx fails immediately
+  - Add retry (3 attempts, exponential backoff) + circuit breaker (open after 5 failures/30s)
+  - Note: overlaps M14.2.2 for Kraken — apply uniformly to all clients | Effort: ~6-8h
+
+**Should Fix:**
+- Story M14.5.6 (MEDIUM): Add global exception middleware (RFC 7807 ProblemDetails) to API
+  - No `UseExceptionHandler` middleware — unhandled exceptions return raw 500 | Effort: ~1h
+- Story M14.5.7 (MEDIUM): Add exponential backoff with jitter to `ExecutionService` manual retry
+  - ExecutionService.cs ~line 356: fixed 200ms delay between order retries — thundering herd risk
+  - Replace with: `delay = min(1000, 100 * 2^attempt) + random(0,100)` | Effort: ~30min
+- Story M14.5.8 (MEDIUM): Standardize persistence `Task` return types to `Task<Result<bool>>`
+  - `PostgresAlertStore.StoreAsync`, `PostgresExecutionIntentStore.SaveAsync` return plain `Task`
+  - Breaks `Result<T>` consistency at persistence boundary | Effort: ~2-3h
+
+**Done when**: all 5 critical fail-closed fixes applied; resilience policies active; tests cover all failure paths.
+**Status**: Backlog
+
+---
+
+#### M14.6 — Performance and Memory
+**Research status**: ✅ Complete | **Overall**: GOOD with targeted improvements available
+
+**Already compliant — no action needed:**
+- Return types: all public methods return `IReadOnlyList<T>` — no double-allocation smell
+- Boxing: zero boxing detected; all value types passed strongly typed
+- Dictionary lookups: `TryGetValue` used correctly throughout; no `ContainsKey + []` pattern
+- IMemoryCache: explicit TTLs on all entries, deterministic keys, no unbounded growth risk
+- String hot paths: no `+` concatenation in loops; no `string.Format()` remaining
+- Collection pre-sizing: `new List<T>(count)` capacity hints used in IndicatorMath throughout
+
+**Must Fix:**
+- Story M14.6.1 (HIGH): Convert `IndicatorMath` core methods to accept `ReadOnlySpan<decimal>`
+  - `ComputeRsi`, `ComputeMacd`, `ComputeStochRsi` in IndicatorMath.cs currently accept `IReadOnlyList<decimal>`
+  - Called per-alert, per-timeframe — highest GC pressure point in the system
+  - Estimated ~15-20% GC reduction in Indicators subsystem under sustained load
+  - Update IndicatorEngine.cs callers accordingly | Risk: LOW | Effort: ~4-6h
+
+**Should Fix:**
+- Story M14.6.2 (MEDIUM): Fix `.Skip().ToList()` double-materialization in KrakenFuturesMarketDataProvider
+  - Lines ~294, 302, 306, 419: `.Skip(n).ToList()` chained on already-materialized list
+  - Replace with slice notation `[n..]` or defer `.ToList()` to final return
+  - Eliminates double-allocation on 500-1000 element candle arrays | Risk: LOW | Effort: ~1-2h
+- Story M14.6.3 (MEDIUM): Remove unnecessary `.ToList()` on closes/volumes in IndicatorEngine
+  - Lines ~142-143: `.Select(c => c.Close).ToList()` and `.Select(c => c.Volume).ToList()`
+  - `IndicatorMath` already accepts `IReadOnlyList<decimal>` — intermediate materializations are redundant
+  - Saves ~50KB/alert across 10 timeframes | Risk: LOW | Effort: <1h
+
+**Nice to Have:**
+- Story M14.6.4 (LOW): Consolidate pivot ordering in ZigZagPivotExtractor and IndicatorEngine
+  - ZigZagPivotExtractor.cs ~line 200, IndicatorEngine.cs ~line 116: `.OrderBy().ToList()` before filter
+  - Combine to single pass; small GC reduction | Effort: ~1-2h
+
+**Done when**: Span<decimal> adopted in IndicatorMath; double-materializations eliminated; build and tests green.
+**Status**: Backlog
+
+---
+
+#### M14.7 — Testing Standards
+**Research status**: ✅ Complete | **Overall**: GOOD foundations, critical coverage gaps in orchestration layer
+
+**Already compliant — no action needed:**
+- xUnit patterns: used idiomatically throughout (constructors, async, `[Fact]`, `[Theory]`)
+- Determinism tests: comprehensive for Elliott and Indicator engines across all timeframes
+- Test isolation: no static mutable state; 23 hand-rolled fakes well-encapsulated
+- Fixtures: organized under `tests/fixtures/` with metadata (symbol, interval, capturedAtUtc)
+- No external mock library — hand-rolled fakes are minimal and interface-bound
+
+**Must Fix:**
+- Story M14.7.1 (CRITICAL): Create `Mvp.Trading.Worker.Tests` project
+  - AlertWorker, ReconciliationWorker, TradeMonitorWorker have ZERO unit tests — these are system entry points
+  - Add coverage: message dequeue, error handling, state transitions
+  - Depends on M14.9.1 (AlertWorker refactor) to be fully testable | Effort: ~2d
+- Story M14.7.2 (CRITICAL): Add WebApplicationFactory integration tests for webhook endpoint
+  - `/api/webhook/tradingview` has no automated tests
+  - Cover: valid ingestion, duplicate idempotency key rejection, invalid JSON, oversized payload | Effort: ~2d
+- Story M14.7.3 (HIGH): Unskip database-dependent KillSwitchService tests
+  - KillSwitchServiceTests.cs lines 23-47 skipped with `[Fact(Skip="Requires database")]`
+  - Implement TestContainers.PostgreSQL fixture | Effort: ~1d
+- Story M14.7.4 (HIGH): Add execution retry logic tests
+  - No tests for transient failure retry, timeout, backoff in ExecutionService | Effort: ~1d
+- Story M14.7.5 (HIGH): Add rate limit exhaustion tests for Kraken integration
+  - No tests for HTTP 429 handling, circuit breaker activation, retry-after parsing | Effort: ~1d
+
+**Should Fix:**
+- Story M14.7.6 (MEDIUM): Add Elliott Wave edge-case tests (empty candles, single pivot, RSI boundary 0/50/100) | Effort: ~1d
+- Story M14.7.7 (MEDIUM): Implement TestContainers for PostgreSQL and Redis (enables CI/CD integration tests) | Effort: ~2d
+
+**Nice to Have:**
+- Story M14.7.8 (LOW): Centralize 23 hand-rolled fakes into shared `Mvp.Trading.TestHelpers` project | Effort: ~1d
+
+**Done when**: Worker tests exist; webhook tests pass; skipped tests re-enabled; retry/rate-limit paths covered.
+**Status**: Backlog
+
+---
+
+#### M14.8 — Security and Secrets Hygiene
+**Research status**: ✅ Complete | **Overall**: 🚨 CRITICAL — real credentials committed to repository
+
+**Already compliant — no action needed:**
+- Runtime secret injection: `IConfiguration` + environment variable substitution — correct pattern
+- Sensitive data in logs: no API keys, passwords, or account numbers in log calls; header sanitization middleware present
+- `.dockerignore`: sensitive files excluded from image build
+
+**🚨 URGENT — act immediately (do not wait for sprint):**
+- Story M14.8.1 (CRITICAL): Revoke all credentials in committed `.env` files
+  - `.env.prod.local` lines 30-31, 59: real Kraken production API keys + OpenAI API key
+  - `.env.demo.local` line 9: ngrok authtoken
+  - `.env.smoke.fixtures` lines 96-98: demo/prod credentials
+  - Action: revoke at Kraken futures.kraken.com, OpenAI platform.openai.com, ngrok dashboard.ngrok.com NOW
+- Story M14.8.2 (CRITICAL): Remove `.env` files from Git history
+  - Use `git filter-branch` or BFG Repo-Cleaner then force-push
+  - `git filter-branch --tree-filter 'rm -f .env.prod.local .env.demo.local .env.smoke.fixtures' -- --all && git gc --prune=now`
+  - Must be done after credential revocation
+- Story M14.8.3 (HIGH): Harden `.gitignore` and add pre-commit secret scanning hook
+  - Add explicit deny rules; install `detect-secrets` or `git-secrets` pre-commit hook | Effort: ~30min
+
+**Must Fix:**
+- Story M14.8.4 (HIGH): Replace simple string `==` comparison with `CryptographicOperations.FixedTimeEquals()` for secrets
+  - Program.cs ~line 141 (webhook), KillSwitchController.cs ~lines 37, 57 (kill switch)
+  - Timing attack prevention for all shared-secret validation | Effort: ~1h
+- Story M14.8.5 (HIGH): Add non-root `USER` to Dockerfile and Dockerfile.worker
+  - Both Dockerfiles run as root — container breakout escalates to host root
+  - Add `RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app && USER appuser` | Effort: ~30min
+
+**Should Fix:**
+- Story M14.8.6 (MEDIUM): Pin Docker image versions for ngrok, Prometheus, Grafana (currently `:latest`) | Effort: ~30min
+- Story M14.8.7 (MEDIUM): Add `dotnet list package --vulnerable` check to CI pipeline | Effort: ~1h
+
+**Nice to Have:**
+- Story M14.8.8 (LOW): Move webhook secret from URL path to `X-Webhook-Signature` HMAC-SHA256 header (prevents secret appearing in access logs) | Effort: ~3-4h
+
+**Done when**: credentials revoked + purged from history; constant-time comparison active; containers non-root; CI scans packages.
+**Status**: Backlog
+
+---
+
+#### M14.9 — Code Organization and Architecture
+**Research status**: ✅ Complete | **Overall**: GOOD architecture, visibility and God Class issues
+
+**Already compliant — no action needed:**
+- Project dependency graph: clean acyclic layered architecture — zero circular dependencies
+- Interface segregation: all interfaces are small and focused (ISP fully respected)
+- Abstraction consistency: all external dependencies (HTTP, DB, Redis, LLM) behind interfaces
+- Naming conventions: PascalCase, I-prefix interfaces, Async suffix — 100% consistent
+- Namespace organization: single root namespace per project, minimal folder structure
+
+**Must Fix:**
+- Story M14.9.1 (CRITICAL): Refactor `AlertWorker` God Class
+  - AlertWorker.cs: 541 lines, 19 constructor dependencies, mixed concerns (queue polling, indicator computation, Elliott analysis, MCP adjudication, trade execution)
+  - Split into focused services (IndicatorSnapshotService, ElliottAdjudicationService, TradeOrchestrationService)
+  - Prerequisite for Worker unit tests (M14.7.1) | Effort: ~16-20h
+- Story M14.9.2 (HIGH): Mark implementation classes as `internal` across all projects
+  - All Options, Store, Query, Engine implementations are `public` unnecessarily
+  - Add `internal` keyword; add `InternalsVisibleTo` for test projects where needed
+  - Non-breaking binary change | Effort: ~2-4h
+- Story M14.9.3 (HIGH): Extract large methods (102-130 lines) in AlertWorker and ExecutionService
+  - `GetAdjudicationAsync`: 102+ lines; `ExecuteKrakenAsync`: 130+ lines
+  - Extract into focused helper classes (McpDecisionNormalizer, OrderSubmissionHandler) | Effort: ~6-8h
+
+**Should Fix:**
+- Story M14.9.4 (MEDIUM): Split `KrakenFuturesMarketDataProvider` (925 lines) into focused classes | Effort: ~12-16h
+- Story M14.9.5 (MEDIUM): Extract DI registration into `AddXxxServices()` extension methods per domain in Program.cs | Effort: ~4-6h
+
+**Done when**: AlertWorker split; internal visibility applied; large methods extracted; build and tests green.
+**Status**: Backlog
+
+---
+
+#### M14.10 — Remediation Report
+**Research status**: ⏳ Pending (produced after M14.1–M14.9 complete)
+- Consolidate all findings into `docs/technical-review-report.md`
+- Severity triage: Critical / High / Medium / Low per finding with file + line reference
+- Prioritized action list grouped by effort (quick wins vs refactors)
+- Propose follow-up milestones for findings requiring dedicated work
+
+**Done when**: full written report in `docs/`; all completed findings reflected as closed stories.
+**Status**: Backlog
+
+---
+
+### M15 — Claude Multi-Agent Setup
+
+**Goal**: Implement a fully Claude-native multi-agent pipeline, completely separate from the existing Codex/AO setup, incorporating C# 14 / .NET 10 skill knowledge and M14 anti-pattern rules into every agent run.
+
+**Research status**: ✅ Complete — Gap analysis done 2026-05-01
+
+#### Gap Analysis Summary (Codex → Claude)
+
+| Area | Codex Setup | Claude Gap |
+|------|------------|------------|
+| Native contract file | `AGENTS.md` | Missing `CLAUDE.md` → **FIXED** |
+| Orchestrator config | `agent-orchestrator.yaml` (codex-only) | Missing `claude-orchestrator.yaml` → **FIXED** |
+| Gate mechanism | Shell sleep + `.done` files | File polling → `read_agent(wait:true)` → **FIXED** |
+| Agent isolation | Git worktrees per role | Main worktree + branches-for-history → **FIXED** |
+| Role prompts | Shell/codex-oriented | Task-tool-oriented Claude prompts → **FIXED** |
+| Plan validation | ❌ None | `rubber-duck` agent inserted after planner → **ADDED** |
+| Code review | Generic reviewer role | Native `code-review` agent type → **UPGRADED** |
+| Skill reference | Not in agent prompts | `docs/csharp-dotnet10-skill.md` mandated in every role → **ADDED** |
+| M14 anti-patterns | Not in agent prompts | Full anti-pattern catalogue in `CLAUDE.md` → **ADDED** |
+| Dry run checklist | tmux/AO-oriented | Claude execution model checklist → **FIXED** |
+| SQL state tracking | File-based only | `.done` files + SQL todos integration → **ADDED** |
+| Bootstrap script | Worktree-per-agent | Bus-only bootstrap, no worktrees required → **FIXED** |
+
+#### Stories
+
+- Story M15.1 (**DONE**): Create `CLAUDE.md` — Claude-native multi-agent contract
+  - Multi-agent roles, policies, stage order, handoff bus definitions
+  - Full M14 anti-pattern catalogue with before/after code examples
+  - Role instructions in Claude task-tool idiom (not shell/ao idiom)
+  - Reference to `docs/csharp-dotnet10-skill.md` mandated for all agents
+  - Rubber-duck stage inserted between planner and builder
+  - `code-review` agent type used for reviewer stage
+  - File: `CLAUDE.md` (repo root, auto-read by Claude)
+
+- Story M15.2 (**DONE**): Create `claude-orchestrator.yaml` — Claude project config
+  - Separate from `agent-orchestrator.yaml` (Codex stays untouched)
+  - `defaults.agent: claude`, `defaults.runtime: copilot-cli`
+  - `skillFile` and `contractFile` pointers for AO integration
+  - 13 agent rules covering all M14 anti-patterns
+  - File: `claude-orchestrator.yaml` (repo root)
+
+- Story M15.3 (**DONE**): Create `bootstrap-feature-claude.sh`
+  - Creates `/tmp/multi-agent-sync/<scope>/` bus without git worktrees
+  - Creates per-role git branches from base (for history/PR review)
+  - Each inbox file references CLAUDE.md, csharp-dotnet10-skill.md
+  - `--force` flag for clean restart, `--no-branches` for doc-only scopes
+  - File: `scripts/agents/bootstrap-feature-claude.sh`
+
+- Story M15.4 (**DONE**): Create `run-feature-once-claude.sh`
+  - Generates full orchestration prompt for all 7 stages
+  - Includes parallel stage 4 (reviewer + quality in same response)
+  - Fallback to `ao send` if AO gains Claude support
+  - File: `scripts/agents/run-feature-once-claude.sh`
+
+- Story M15.5 (**DONE**): Create `DRY_RUN_CHECKLIST_CLAUDE.md`
+  - Full pre-flight checklist (7 file checks)
+  - Stage-by-stage gate criteria for Claude execution model
+  - Observability comparison table: Codex vs Claude
+  - M14 anti-pattern check list at quality gate
+  - Final report template
+  - File: `docs/DRY_RUN_CHECKLIST_CLAUDE.md`
+
+- Story M15.7 (**DONE**): Fix single-branch model — remove per-role branches from both setups
+  - **Codex**: `bootstrap-feature.sh` now creates single `feature/<scope>` branch + 1 shared worktree (was: 6 per-role branches + 6 worktrees)
+  - **Codex**: `run-feature-once-ao.sh` action blocks no longer say `git checkout -B agent/<role>/<scope>`; builder commits then saves `git diff main..HEAD > outbox/builder.diff`; reviewer/quality/integrator read `outbox/builder.diff`
+  - **Claude**: `bootstrap-feature-claude.sh` creates single `feature/<scope>` branch (was: 6 per-role branches)
+  - **Claude**: `run-feature-once-claude.sh` builder prompt commits + saves diff; reviewer/quality/integrator prompts read from `outbox/builder.diff`
+  - `CLAUDE.md`, `AGENTS.md`, `DRY_RUN_CHECKLIST_CLAUDE.md` all updated with single-branch model
+
+- Story M15.6 (Backlog): Run dry-run validation pass
+  - Execute `bootstrap-feature-claude.sh --scope dryrun-claude-doc-only`
+  - Run full 7-stage pipeline on a doc-only change
+  - Verify all gate checks pass
+  - Confirm M14 quality checks fire correctly
+  - Sign off dry run as PASS before using on real feature work
+
+**Done when**: All 7 stories complete; dry run PASS confirmed; Codex setup updated and still functional.
+**Status**: M15.1–M15.5, M15.7 DONE | M15.6 Backlog

@@ -130,15 +130,14 @@ if ! git show-ref --verify --quiet "refs/heads/${BASE_BRANCH}"; then
   exit 1
 fi
 
-for role in "${AGENTS[@]}"; do
-  branch="agent/${role}/${SCOPE}"
-  if ! git show-ref --verify --quiet "refs/heads/${branch}"; then
-    git branch "$branch" "$BASE_BRANCH"
-    echo "Created branch: $branch"
-  else
-    echo "Branch exists: $branch"
-  fi
-done
+# Single feature branch — all agents work on the same branch.
+FEATURE_BRANCH="feature/${SCOPE}"
+if ! git show-ref --verify --quiet "refs/heads/${FEATURE_BRANCH}"; then
+  git branch "$FEATURE_BRANCH" "$BASE_BRANCH"
+  echo "Created feature branch: ${FEATURE_BRANCH}"
+else
+  echo "Feature branch exists: ${FEATURE_BRANCH}"
+fi
 
 ensure_worktree() {
   local path="$1"
@@ -160,18 +159,20 @@ ensure_worktree() {
   echo "Created worktree: $path ($branch)"
 }
 
+# Orchestrator on main; all other roles share the feature worktree.
 ensure_worktree "$WORKTREE_ROOT/orchestrator" "$BASE_BRANCH"
-for role in "${AGENTS[@]}"; do
-  ensure_worktree "$WORKTREE_ROOT/${role}" "agent/${role}/${SCOPE}"
-done
+ensure_worktree "$WORKTREE_ROOT/feature" "$FEATURE_BRANCH"
 
 ORCH_PATH="$(resolve_worktree_for_branch "$BASE_BRANCH" "$WORKTREE_ROOT/orchestrator" || true)"
-BUILDER_PATH="$(resolve_worktree_for_branch "agent/builder/${SCOPE}" "$WORKTREE_ROOT/builder" || true)"
-PLANNER_PATH="$(resolve_worktree_for_branch "agent/planner/${SCOPE}" "$WORKTREE_ROOT/planner" || true)"
-REVIEWER_PATH="$(resolve_worktree_for_branch "agent/reviewer/${SCOPE}" "$WORKTREE_ROOT/reviewer" || true)"
-QUALITY_PATH="$(resolve_worktree_for_branch "agent/quality/${SCOPE}" "$WORKTREE_ROOT/quality" || true)"
-TESTER_PATH="$(resolve_worktree_for_branch "agent/tester/${SCOPE}" "$WORKTREE_ROOT/tester" || true)"
-INTEGRATOR_PATH="$(resolve_worktree_for_branch "agent/integrator/${SCOPE}" "$WORKTREE_ROOT/integrator" || true)"
+FEATURE_PATH="$(resolve_worktree_for_branch "$FEATURE_BRANCH" "$WORKTREE_ROOT/feature" || true)"
+
+# All non-orchestrator agents run in the shared feature worktree.
+PLANNER_PATH="$FEATURE_PATH"
+BUILDER_PATH="$FEATURE_PATH"
+REVIEWER_PATH="$FEATURE_PATH"
+QUALITY_PATH="$FEATURE_PATH"
+TESTER_PATH="$FEATURE_PATH"
+INTEGRATOR_PATH="$FEATURE_PATH"
 
 for var_name in ORCH_PATH PLANNER_PATH BUILDER_PATH REVIEWER_PATH QUALITY_PATH TESTER_PATH INTEGRATOR_PATH; do
   if [[ -z "${!var_name}" ]]; then
