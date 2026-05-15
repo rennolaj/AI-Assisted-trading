@@ -819,3 +819,548 @@
 
 **Done when**: All 7 stories complete; dry run PASS confirmed; Codex setup updated and still functional.
 **Status**: M15.1–M15.5, M15.7 DONE | M15.6 Backlog
+
+---
+
+### M16 — Deterministic Adjudication Engine (NEW - HIGH)
+**Goal**: Analyse the full LLM I/O dataflow and replace the LLM adjudication call with a pure deterministic C# engine, eliminating LLM latency, cost, and non-determinism from the trade-gating hot path.
+
+#### Background
+
+The current LLM adjudication call (`IMcpGateway.AdjudicateElliottAsync`) sends a JSON payload to an LLM (OpenAI or local) and asks it to evaluate Elliott Wave candidates. However, inspection of `prompts/adjudicate-elliott.md` reveals that the prompt itself already encodes a **fully deterministic step-by-step algorithm** — there is no reasoning or judgment involved; the LLM is being used as an expensive JSON-in/JSON-out rule engine.
+
+**Key finding: the LLM is already constrained to 5 possible outputs** (`ALLOWLONGW3`, `ALLOWLONGW5END`, `ALLOWSHORTW3`, `ALLOWSHORTW5END`, `REJECT`) decided by 4 explicit boolean conditions. This is trivially implementable as a pure C# function with zero external calls.
+
+#### Current LLM Dataflow
+
+```
+AlertWorker
+  └─ GetAdjudicationAsync(ElliottAdjudicationInput, ct)
+       ├─ Input type: ElliottAdjudicationInput
+       │    ├─ Direction: "LONG" | "SHORT"                  ← from AlertEvent.Intent
+       │    ├─ Snapshot: SignalSnapshot                      ← from IndicatorEngine
+       │    ├─ Candidates: ElliottCandidates                 ← from ElliottEngine
+       │    │    └─ candidates[]: ElliottCandidate[]
+       │    │         ├─ candidateId: string
+       │    │         ├─ waveLabel: "W3" | "W5END" | ...
+       │    │         ├─ ruleViolations: RuleViolation[]     ← empty = clean candidate
+       │    │         └─ invalidation:
+       │    │              ├─ longInvalidationPrice: decimal?
+       │    │              └─ shortInvalidationPrice: decimal?
+       │    └─ Policy: RiskPolicy                            ← from risk-policy.json
+       │
+       └─ IMcpGateway.AdjudicateElliottAsync(input, ct)
+            ├─ Renders prompt template (adjudicate-elliott.md) with {{input}} substituted
+            ├─ Sends to OpenAI / LocalLLM HTTP endpoint
+            └─ Returns Result<McpAdjudicationResult>
+                 └─ McpAdjudicationResult wraps LlmDecision:
+                      ├─ Decision: "ALLOWLONGW3" | "ALLOWLONGW5END" | "ALLOWSHORTW3" | "ALLOWSHORTW5END" | "REJECT"
+                      ├─ Confidence: decimal (0.0–1.0)
+                      ├─ ChosenCandidateId: string?
+                      ├─ StopLossAnchor: "WAVEINVALIDATION" | "NONE"
+                      └─ Notes: string
+```
+
+#### The Algorithm (already encoded in the prompt — verbatim)
+
+```
+FOR EACH candidate in Candidates:
+  IF ruleViolations == []                              ← no violations
+    AND direction == "LONG" AND waveLabel == "W3"
+    AND longInvalidationPrice is not null
+    → RETURN ALLOWLONGW3 (chosenCandidateId, confidence=0.7, anchor=WAVEINVALIDATION)
+
+  IF ruleViolations == []
+    AND direction == "LONG" AND waveLabel == "W5END"
+    AND longInvalidationPrice is not null
+    → RETURN ALLOWLONGW5END
+
+  IF ruleViolations == []
+    AND direction == "SHORT" AND waveLabel == "W3"
+    AND shortInvalidationPrice is not null
+    → RETURN ALLOWSHORTW3
+
+  IF ruleViolations == []
+    AND direction == "SHORT" AND waveLabel == "W5END"
+    AND shortInvalidationPrice is not null
+    → RETURN ALLOWSHORTW5END
+
+RETURN REJECT (no candidate matched)
+```
+
+#### Stories
+
+- Story M16.1 (ANALYSIS — DONE): Document full LLM I/O dataflow and feasibility assessment
+  - **Finding**: LLM adjudication is a deterministic 4-rule filter. No probabilistic reasoning. Fully replaceable.
+  - **Input**: `ElliottAdjudicationInput` (Direction + ElliottCandidates with waveLabel + ruleViolations + invalidation prices)
+  - **Output**: `LlmDecision` (one of 5 enum values, fixed confidence=0.7, fixed anchor=WAVEINVALIDATION on ALLOW)
+  - **Risk of LLM**: latency (500–2000ms/call), cost (token fees), non-determinism (LLM can hallucinate despite strict prompt), HTTP dependency (outage = no trades)
+  - **Risk of deterministic**: none — the algorithm is already explicit and testable
+
+- Story M16.2: Implement `DeterministicElliottAdjudicator` in `Mvp.Trading.Risk`
+  - New internal sealed class `DeterministicElliottAdjudicator : IElliottAdjudicator`
+  - New interface `IElliottAdjudicator` in `Mvp.Trading.Contracts` (or co-located in Risk)
+  - Implements the 4-rule loop verbatim in pure C# — no HTTP, no JSON rendering, no external call
+  - Returns `Result<LlmDecision>` using same contract as existing `McpAdjudicationResult`
+  - Confidence fixed at `0.7m` (match current LLM default), anchor = `WAVEINVALIDATION` on ALLOW, `NONE` on REJECT
+  - Unit tests: cover all 4 ALLOW paths, REJECT on violations present, REJECT on null invalidation price, REJECT on empty candidates, REJECT on direction mismatch, first-match semantics (multiple candidates — picks first valid)
+
+- Story M16.3: Wire `DeterministicElliottAdjudicator` into `AlertWorker` as primary path
+  - Replace `_mcpGateway.AdjudicateElliottAsync(input, ct)` call with `_adjudicator.AdjudicateAsync(input, ct)`
+  - Keep `IMcpGateway` wired in DI but demote to optional fallback or remove entirely (decide in implementation)
+  - Remove prompt template rendering path from hot path — `FilePromptTemplateStore` no longer called per alert
+  - Update `AlertWorker` DI constructor: remove `IMcpGateway` if fully replaced, or mark optional
+  - Update `LlmAdjudicationStore` persistence: set `llm_provider = "deterministic"`, `llm_model = "rule-engine-v1"`, `prompt_text = ""`, `raw_response = ""` (or skip persistence for deterministic path)
+  - Feature flag: add `Adjudication:Mode = "deterministic" | "llm" | "llm-with-deterministic-fallback"` to config
+  - `ValidateOnStart` + `[Required]` on the new options class
+
+- Story M16.4: Add `llm-with-deterministic-fallback` mode
+  - If LLM HTTP call fails or times out → fall back to deterministic engine automatically
+  - Log `LogWarning` with correlation ID when fallback activates
+  - Metric: `adjudication_fallback_total` counter (label: `reason=timeout|error|circuit_open`)
+  - This gives zero-downtime LLM → deterministic migration path
+
+- Story M16.5: Validation and regression tests
+  - Replay all existing LLM fixture files (`tests/fixtures/llm-decisions/`) through deterministic engine
+  - Assert deterministic output matches recorded LLM output for every fixture (known-good regression suite)
+  - Add property-based tests: any candidate with non-empty `ruleViolations` always produces REJECT
+  - Add property-based tests: any candidate with `null` invalidation price for matching direction always produces REJECT
+  - Confirm `./scripts/test.sh` passes
+
+- Story M16.6 (OPTIONAL): Remove LLM dependency entirely
+  - Once M16.5 passes and deterministic mode has run in demo for 2+ weeks without issues
+  - Remove `OpenAiMcpGateway`, `LocalLlmMcpGateway`, `InProcessMcpGateway` from codebase
+  - Remove `adjudicate-elliott.md` prompt template (archive in docs/)
+  - Remove `McpProvider` config section and `IMcpGateway` interface
+  - Remove OpenAI NuGet packages
+  - Estimated savings: ~$0–20/month in OpenAI tokens; 500–2000ms latency per alert removed
+
+**Done when**: `DeterministicElliottAdjudicator` passes all fixture replay tests; feature flag controls mode; demo validated with `Adjudication:Mode=deterministic` for 5+ real alerts; optional LLM fallback documented.
+**Status**: Backlog | M16.1 DONE (analysis complete — deterministic replacement confirmed feasible)
+**Rationale**: The LLM prompt is already a deterministic algorithm. Using an LLM to execute it introduces latency, cost, and fragility with zero benefit. The deterministic engine is strictly superior for this use case.
+
+---
+
+### M17 — LLM Architecture Redesign: ADRs and Strategic Direction (NEW - STRATEGIC)
+**Goal**: Define the architectural direction for where LLM adds genuine, irreplaceable value in the trading system — and where it must not be used. Produce a set of Architecture Decision Records (ADRs) that govern all future LLM integration.
+
+#### Context: Full Analysis of Current LLM Usage
+
+**Two active LLM tools exist today:**
+
+| Tool | Prompt | Input | Output | Verdict |
+|------|--------|-------|--------|---------|
+| `adjudicateElliott` | 72-line deterministic algorithm in natural language | `Direction` + `ElliottCandidates` | 5-enum `LlmDecision` | ❌ Replace with deterministic code (M16) |
+| `explainStopLoss` | 10-line stub "suggest a stop-loss anchor" | `Side` + `ElliottCandidate` + `SignalSnapshot` + `RiskPolicy` | `StopLossSuggestion(Anchor, Price?, Notes)` | ⚠️ Underdeveloped — huge untapped potential |
+
+**Critical finding: The `SignalSnapshot` (RSI, StochRSI, MACD, Volume across all timeframes) is passed to the adjudication LLM but the prompt NEVER uses it.** The LLM only reads `direction` and `candidates`. This means the most contextually rich data in the system is being sent as dead weight on every LLM call.
+
+**What the full `ElliottAdjudicationInput` actually contains:**
+```
+Direction: "LONG" | "SHORT"
+SignalSnapshot:
+  ├─ Timeframes[]: M5, M15, M30, H1, H2 (configurable)
+  │    ├─ RSI: value + state ("OVERSOLD" | "NEUTRAL" | "OVERBOUGHT")
+  │    ├─ StochRSI: K, D, state
+  │    ├─ MACD: macd, signal, histogram, state ("BULLISH_CROSS" | etc.)
+  │    └─ Volume: value, state, rule
+ElliottCandidates:
+  ├─ BaseTimeframe
+  └─ candidates[]: waveLabel, score, confidence, ruleViolations, invalidation prices
+RiskPolicy: maxRisk%, maxLeverage, maxNotional, allowedSides
+```
+
+**Current architecture weaknesses:**
+1. `adjudicateElliott` is deterministic logic pretending to need AI — costs money, adds latency, fails non-deterministically
+2. `explainStopLoss` has a meaningless 10-line prompt — no structure, no examples, no context on how to reason
+3. `SignalSnapshot` (the richest context) is never analysed by any LLM
+4. LLM infrastructure (OpenAI + local gateway + router + schema validation) is solid — but pointed at the wrong problems
+5. No post-trade learning loop — the LLM never sees outcomes
+6. No market regime awareness — the LLM doesn't know if we're in a trending or ranging market
+7. `Microsoft.Extensions.AI` not used — abstraction is hand-rolled; swapping models requires code changes
+
+**Microsoft .NET AI agent best practices (from learn.microsoft.com/dotnet/ai/conceptual/agents):**
+- Agents = **reasoning + tools + context**. Use LLMs where all three are needed.
+- Sequential workflows: deterministic engine → LLM advisory layer → execution
+- Handoff pattern: pass to LLM only when deterministic rules cannot make a decision
+- MCP servers as tools: LLM should invoke tools to get data, not receive it pre-packaged
+- Observability is non-negotiable: every model call, tool invocation, and decision must be traced
+- Microsoft.Extensions.AI provides provider-agnostic abstractions — prefer over custom gateway code
+- Hosted agents (Azure AI Foundry): for complex multi-step reasoning scenarios at scale
+
+#### Where LLM Adds Genuine, Irreplaceable Value in This System
+
+| Use Case | Why LLM? | Cannot Be Deterministic Because |
+|----------|----------|---------------------------------|
+| **Multi-timeframe confluence quality scoring** | Reason about subtle alignment: RSI divergence + volume spike + MACD cross across 3+ timeframes is "strong" vs "weak" | Confluence patterns are fuzzy, context-dependent, and not reducible to binary thresholds |
+| **Dynamic stop-loss placement reasoning** | Consider ATR, key S/R from pivot history, Elliott structure depth to choose optimal stop anchor | Requires judgment about which of several valid stop levels is best in context |
+| **Market regime detection** | Classify current regime: trending, ranging, volatile, consolidating — to adapt trade sizing/approach | Regime boundaries are not crisp; requires pattern recognition across multiple signals |
+| **Trade rationale narration** | Generate human-readable audit trail explaining WHY a trade was taken | Requires synthesis of multi-dimensional context into natural language |
+| **Post-trade review** | After trade closes (win/loss), analyse what signals were predictive vs misleading | Requires temporal reasoning and counterfactual analysis |
+| **Anomaly / override detection** | Flag unusual Elliott structures, contradictory indicator readings, or abnormal market conditions before execution | Edge cases are infinite; deterministic rules cannot enumerate them |
+
+#### Architecture Decision Records (ADRs)
+
+---
+
+##### ADR-001: Separate Deterministic Gating from LLM Advisory Layer
+
+**Status**: PROPOSED
+**Decision**: The trade execution gate (ALLOW/REJECT) MUST be decided by deterministic code. The LLM layer is ADVISORY ONLY — it provides scoring, context enrichment, and quality assessment that can influence trade sizing and confidence, but cannot veto a trade that the deterministic engine approved, and cannot approve a trade that the deterministic engine rejected.
+
+**Rationale**:
+- Deterministic gating is auditable, testable, and reproducible
+- LLM-as-gatekeeper introduces latency and non-determinism on the execution-critical path
+- Advisory LLM can still influence outcomes via confidence scores and position sizing adjustments
+- Fail-closed is guaranteed: if the LLM is unavailable, the deterministic engine already made the decision
+
+**Implementation**:
+- `DeterministicElliottAdjudicator` (M16.2): PRIMARY gate — approves or rejects based on wave/violation/invalidation rules
+- `LlmConfluenceAdvisor` (M17): ADVISORY layer — scores signal quality (0.0–1.0) and returns `ConfluenceAssessment`
+- Risk engine uses `ConfluenceAssessment.Score` to modulate position size (e.g., full size at 0.8+, half size at 0.5–0.8, skip below 0.5)
+
+**Constraints**:
+- LLM advisor is called AFTER deterministic gate passes — never before
+- LLM advisor timeout = 3 seconds; on timeout → use default confidence (0.65) and proceed
+- All LLM advisory calls must be persisted to `llm_adjudications` (M9.7)
+
+---
+
+##### ADR-002: Redesign LLM Input — Make SignalSnapshot the Primary Context
+
+**Status**: PROPOSED
+**Decision**: The primary input to ANY LLM call must be the full `SignalSnapshot` with rich multi-timeframe context. Elliott candidates are secondary context. The current pattern of sending Elliott candidates as primary and ignoring SignalSnapshot must be inverted.
+
+**Rationale**:
+- RSI, MACD, StochRSI, Volume across 5 timeframes is the richest market context available
+- Elliott wave pattern tells you WHAT structure may be forming; indicators tell you HOW STRONG the move is
+- Current prompt uses neither RSI nor MACD data — this is the most significant missed opportunity in the system
+- Indicator confluence is where LLM reasoning exceeds any deterministic rule set
+
+**New primary LLM input structure**:
+```
+LlmConfluenceInput:
+  ├─ AlertContext: symbol, direction, timeframe, alertTime
+  ├─ SignalSnapshot: FULL multi-timeframe indicator data (THIS IS PRIMARY)
+  ├─ ElliottContext: chosen candidate, wave label, confidence score (THIS IS SECONDARY)
+  ├─ MarketRegimeHint: trending/ranging/volatile (from a lightweight deterministic check)
+  └─ RiskContext: policy limits, current exposure
+```
+
+---
+
+##### ADR-003: Migrate to `Microsoft.Extensions.AI` for LLM Provider Abstraction
+
+**Status**: PROPOSED
+**Decision**: Replace the hand-rolled `IMcpGateway` / `OpenAiMcpGateway` / `LocalLlmMcpGateway` / `McpGatewayRouter` with `Microsoft.Extensions.AI` (`IChatClient`) for provider abstraction. Keep the existing `IMcpGateway` interface as a domain-level facade over the standardised client.
+
+**Rationale**:
+- `Microsoft.Extensions.AI` (`Microsoft.Extensions.AI` NuGet) is the .NET standard for AI abstraction
+- `IChatClient` supports OpenAI, Azure OpenAI, local LLMs (Ollama), and any OpenAI-compatible endpoint
+- Built-in: middleware pipeline (logging, caching, retry), function calling, structured output
+- Eliminates 300+ lines of hand-rolled gateway code (`OpenAiMcpGateway`, `LocalLlmMcpGateway`)
+- Auto-fallback and provider switching is built into the middleware pipeline
+- Structured JSON output support (`chatClient.GetResponseAsync<T>()`) eliminates manual schema validation
+
+**Migration path**:
+- Add `Microsoft.Extensions.AI.OpenAI` and `Microsoft.Extensions.AI` NuGet packages
+- Register `IChatClient` in DI with middleware: `AddOpenAIChatClient().UseLogging().UseDistributedCache()`
+- Wrap `IChatClient` in a domain-level `ILlmAdvisoryGateway` that returns typed domain results
+- Keep `McpGatewayRouter` as a thin orchestrator using the new client
+- Remove `IOpenAiResponsesClient`, `ILocalLlmResponsesClient`, and `IJsonSchemaValidator` (replaced by MEA structured output)
+
+---
+
+##### ADR-004: Implement `LlmConfluenceAdvisor` — Multi-Timeframe Indicator Confluence Scoring
+
+**Status**: PROPOSED
+**Decision**: Replace the `adjudicateElliott` LLM tool with a new `LlmConfluenceAdvisor` that analyses indicator confluence across timeframes and returns a confidence score + quality assessment, not a binary ALLOW/REJECT decision.
+
+**Rationale**:
+- This is the genuine value-add: pattern recognition across RSI + MACD + StochRSI + Volume combinations
+- Output is a score (0.0–1.0) that modulates position sizing — not a gate
+- Prompt can be 200–400 tokens (focused); current prompt is 400+ tokens for a task a `if` statement can do
+
+**New prompt concept for `confluenceScore` tool**:
+```
+Given a {direction} trade signal on {symbol} {timeframe}:
+
+Elliott context: {waveLabel} pattern, confidence={elliottConfidence}
+Indicators:
+  M5:  RSI={rsi_m5} ({rsi_m5_state}), MACD={macd_m5_state}, Volume={vol_m5_state}
+  M15: RSI={rsi_m15} ({rsi_m15_state}), MACD={macd_m15_state}, StochRSI K={k_m15}/D={d_m15}
+  H1:  RSI={rsi_h1} ({rsi_h1_state}), MACD={macd_h1_state}
+
+Score the confluence quality from 0.0 (poor) to 1.0 (excellent):
+- Higher score when: RSI not overbought on entry direction, MACD aligned across 2+ timeframes,
+  StochRSI not peaking at entry, volume confirms direction
+- Lower score when: divergences present, mixed signals across timeframes, overbought/oversold extremes
+
+Return: {"confluenceScore": 0.0-1.0, "alignedTimeframes": [...], "concerns": [...], "recommendation": "FULL_SIZE|HALF_SIZE|SKIP"}
+```
+
+---
+
+##### ADR-005: Implement `LlmStopLossAdvisor` — Replace the 10-Line Stub Prompt
+
+**Status**: PROPOSED
+**Decision**: Rewrite `explainStopLoss` with a substantive prompt that uses Elliott structure depth, ATR-based distance, and key pivot levels to recommend an optimal stop anchor. Output must include a specific price recommendation with reasoning.
+
+**Rationale**:
+- Current `explain-stoploss.md` is 10 lines with no examples and no reasoning framework
+- The deterministic stop is always `invalidation.longInvalidationPrice` / `shortInvalidationPrice` — one choice
+- An LLM can reason about whether the Elliott invalidation price is too tight (risk of stop-out before the move), too wide (excessive risk), or optimal — and suggest alternatives (e.g., ATR-based stop if Elliott stop is too far)
+- This is genuine judgment that cannot be deterministically encoded
+
+**Output contract** (extends existing `StopLossSuggestion`):
+```json
+{
+  "anchor": "WAVEINVALIDATION" | "ATR_BASED" | "KEY_SUPPORT" | "PERCENTAGE",
+  "suggestedStopPrice": 94500.00,
+  "riskRewardRatio": 2.8,
+  "notes": "Elliott invalidation at 94,200 is 1.8% away — tight but technically correct for W3. ATR-based at 94,500 adds buffer without excessive risk.",
+  "confidence": 0.82
+}
+```
+
+---
+
+##### ADR-006: Add Post-Trade LLM Review Loop
+
+**Status**: PROPOSED
+**Decision**: After each trade closes (win, loss, or manual exit), asynchronously send the full trade context (entry signal, LLM advisory, execution, outcome) to an LLM for pattern review. Store analysis in a new `trade_reviews` table.
+
+**Rationale**:
+- This is where LLM adds unique long-term value: pattern recognition over outcomes
+- "Which indicator combinations predicted profitable W3 trades on BTCUSD.P M15?"
+- Creates a feedback loop: `trade_reviews` data informs prompt tuning and policy updates
+- Async (does not block execution path): called by `ReconciliationWorker` when trade closes
+- No latency risk: review happens after-the-fact
+
+**Trigger**: `ReconciliationWorker` detects `STATUS_MISMATCH` (filled) or trade closed → enqueue review task
+**Not on critical path**: all LLM review calls are fire-and-observe, never block trading
+
+---
+
+##### ADR-007: Market Regime Detection as Lightweight Deterministic Pre-Filter
+
+**Status**: PROPOSED
+**Decision**: Add a lightweight deterministic market regime classifier that runs before the LLM confluence advisor. Regime output (`TRENDING` | `RANGING` | `VOLATILE` | `CONSOLIDATING`) is used as a hint in the LLM prompt and as a position sizing multiplier.
+
+**Rationale**:
+- LLM confluence scoring is most valuable in trending markets; less reliable in choppy ranging markets
+- A deterministic regime check (e.g., ADX > 25 = trending, Bollinger band width percentile, etc.) can short-circuit LLM call in clearly unsuitable conditions
+- Adds context to LLM prompt so the model can reason about whether Elliott patterns are reliable in current regime
+- Low effort, high value: saves LLM calls in ranging markets where trades have lower expected value
+
+**Implementation**: New `MarketRegimeClassifier` in `Mvp.Trading.Indicators` using existing indicator data (no new API calls)
+
+---
+
+##### ADR-008: Adopt Structured Output (`GetResponseAsync<T>`) over Manual JSON Schema Validation
+
+**Status**: PROPOSED
+**Decision**: Use `Microsoft.Extensions.AI`'s `GetResponseAsync<T>()` with `ChatResponseFormat.ForType<T>()` for all LLM calls instead of the current hand-rolled JSON schema validation pipeline.
+
+**Rationale**:
+- Current pipeline: render prompt → send to OpenAI → receive string → validate against JSON schema file → deserialize → handle errors = 5 steps, ~300 lines of code per gateway
+- With MEA structured output: `await chatClient.GetResponseAsync<LlmConfluenceScore>(prompt, options)` = 1 step, ~10 lines
+- Type safety at call site: compiler knows the return type
+- Eliminates `IJsonSchemaValidator`, `FilePromptTemplateStore` schema loading, and all manual `JsonSerializer` calls
+- OpenAI structured output mode (`response_format: json_schema`) is used automatically
+
+**Constraint**: Keep `JsonSchema` attributes on response records for documentation and validation fallback
+
+---
+
+#### M17 Stories
+
+- Story M17.1: Write full ADR document set (`docs/adr/`) — one markdown file per ADR (ADR-001 through ADR-008)
+  - Each ADR: Status, Context, Decision, Rationale, Consequences, Implementation notes
+  - Review with stakeholder before any implementation begins
+
+- Story M17.2: Adopt `Microsoft.Extensions.AI` — migrate gateway infrastructure (ADR-003)
+  - Add `Microsoft.Extensions.AI.OpenAI` NuGet package
+  - Register `IChatClient` in DI with OpenAI and Ollama providers behind feature flag
+  - Remove `IOpenAiResponsesClient`, `ILocalLlmResponsesClient`, `IJsonSchemaValidator` (hand-rolled)
+  - Rewrite `OpenAiMcpGateway` and `LocalLlmMcpGateway` as thin adapters over `IChatClient`
+  - Depends on M16.2 (deterministic adjudicator already replacing the gate)
+
+- Story M17.3: Implement `LlmConfluenceAdvisor` — multi-timeframe scoring (ADR-004)
+  - New tool: `confluenceScore`
+  - New prompt: structured template using SignalSnapshot as primary context
+  - New contract: `ConfluenceAssessment(decimal Score, string[] AlignedTimeframes, string[] Concerns, string Recommendation)`
+  - Wire into AlertWorker AFTER deterministic gate passes
+  - Position size modulation: `quantity = baseQuantity * confluenceScore.SizingMultiplier`
+
+- Story M17.4: Rewrite `LlmStopLossAdvisor` — substantive stop reasoning (ADR-005)
+  - New prompt with examples, ATR context, and riskRewardRatio output
+  - Called after trade plan is built; can override stop price within ±20% of Elliott invalidation
+  - Store full prompt/response in `llm_adjudications`
+
+- Story M17.5: Implement `MarketRegimeClassifier` (ADR-007)
+  - Deterministic classifier in `Mvp.Trading.Indicators` using ADX + Bollinger Width
+  - Outputs `MarketRegime` enum passed to LLM prompt as context
+  - Regime also feeds a position sizing multiplier (e.g., `RANGING` → 0.5× size cap)
+
+- Story M17.6: Add post-trade LLM review loop (ADR-006)
+  - New `trade_reviews` table: trade outcome + signal context + LLM analysis
+  - `ReconciliationWorker` enqueues closed trades for async review
+  - New prompt: outcome-aware analysis with recommendations
+
+- Story M17.7: Structured output adoption for all LLM calls (ADR-008)
+  - Use `GetResponseAsync<T>()` with `ChatResponseFormat.ForType<T>()` everywhere
+  - Remove `FilePromptTemplateStore` JSON schema loading
+  - Eliminates ~300 lines of hand-rolled validation code
+
+**Done when**: All 8 ADRs documented and reviewed; M17.2 (MEA migration) and M17.3 (confluence advisor) implemented and validated in demo; LLM is advisory-only with deterministic gate active (M16 complete).
+**Status**: Backlog | ADRs PROPOSED — require review before implementation
+**Dependencies**: M16.2 (DeterministicElliottAdjudicator) must be complete before M17.3 begins
+
+---
+
+## Milestone M18 — Azure Security Posture (MCSB v2 Alignment)
+
+**Objective**: Bring the deployment configuration, container definitions, and CI/CD pipeline into alignment with the Microsoft Cloud Security Benchmark v2 (MCSB v2) and the Secure Future Initiative (SFI) six-pillar model. No new business features — this milestone is purely security hardening.
+
+**Scope boundary**:
+- Azure deployment configuration (ACR, App Service, PostgreSQL, Redis, Key Vault, VNet)
+- Dockerfile and docker-compose hardening
+- CI/CD pipeline security controls
+- Application-level secret and identity management
+
+**Out of scope**:
+- Business logic or trading algorithm changes
+- New Azure services not yet in the intended architecture
+- On-premises infrastructure (no on-prem in this setup)
+
+**MCSB v2 Domains addressed**:
+| Domain | Code | Stories |
+|--------|------|---------|
+| Identity Management | IM | M18.1, M18.2 |
+| Network Security | NS | M18.3 |
+| Data Protection | DP | M18.2, M18.4 |
+| Privileged Access | PA | M18.4 |
+| Logging & Threat Detection | LT | M18.5 |
+| Posture & Vulnerability Mgmt | PV | M18.5, M18.6 |
+| DevOps Security | DS | M18.6 |
+| Endpoint Security | ES | M18.7 |
+| AI Security | AI | M18.8 |
+| Backup & Recovery | BR | M18.9 |
+
+**Current security findings (baseline)**:
+- ❌ No Terraform or Bicep source files in repo — only local `terraform.tfstate`, `terraform.tfstate.backup`, `tfplan`, `terraform.tfvars`, and `parameters.local.json` artifacts exist under `infra/`
+- ❌ Current state backup shows mixed Azure hosting: API on App Service F1; Worker, monitoring, and Ollama on Azure Container Instances (ACI)
+- ❌ Containers run as root — no `USER` directive in Dockerfile or Dockerfile.worker (M14.8.5 — already tracked)
+- ❌ String equality for secret comparison (webhook + KillSwitch) — timing-attack vulnerable (M14.8.4 — already tracked)
+- ❌ Unpinned image tags (`:latest`) for postgres, redis, ngrok, prometheus, grafana (M14.8.6 — already tracked)
+- ❌ No Managed Identity — all Azure service access uses API keys/connection strings in env vars
+- ❌ No Azure Key Vault — secrets in `terraform.tfvars` (gitignored but plaintext on disk)
+- ❌ No VNet or private endpoints — Redis and Postgres publicly reachable in the observed Azure baseline
+- ❌ No Microsoft Defender for Cloud enabled — no CSPM posture score
+- ❌ No database least-privilege — postgres admin account used by application
+- ❌ No secret scanning in CI — no `dotnet list package --vulnerable` gate (M14.8.7 — tracked)
+- ❌ No AI security posture — OpenAI API key unrotated in local file; no prompt injection protection audit
+
+**ADR documents**: ADR-009 through ADR-018 in `docs/adr/`
+
+---
+
+### M18 Stories
+
+- Story M18.0: Reconstruct Azure IaC source of truth (BLOCKER)
+  - Choose one authoritative IaC path for Azure resource changes: Terraform or Bicep; do not maintain both as competing sources of truth
+  - Recreate source for the observed baseline: resource group, ACR, App Service plan, API App Service, Worker/monitoring/Ollama ACI workloads, PostgreSQL Flexible Server, PostgreSQL database, Redis, role assignments, diagnostics, and networking placeholders
+  - Reconcile/import existing Azure resources from live Azure and the local `terraform.tfstate.backup`; do not commit `.tfstate`, `.tfvars`, `tfplan`, or `parameters.local.json`
+  - Move Terraform state to a protected encrypted remote backend if Terraform is selected, or document the Bicep deployment-state model if Bicep is selected
+  - Replace secret-bearing local variable/parameter workflows with sample templates that contain placeholders only
+  - Acceptance: clean `terraform plan` or Bicep `what-if` shows no unintended destroy/recreate; M18.1-M18.5 have concrete source files to modify; local state, plan, and secret files remain gitignored
+
+- Story M18.1: Managed Identity adoption for Azure-hosted containers (ADR-009)
+  - Enable managed identity on every Azure-hosted workload: API App Service and Worker/monitoring/Ollama ACI if retained; if Worker migrates to App Service or Container Apps, document that hosting decision before implementation
+  - Replace all connection string credentials with identity-based auth where possible
+  - Postgres: enable Microsoft Entra authentication, configure an Entra administrator, and create database principals for the API and Worker workload identities with `pgaadauth_create_principal(...)`
+  - Postgres: migrate runtime auth to Entra ID token auth (eliminates postgres_password from app runtime env)
+  - Redis: migrate to Entra ID auth (Azure Cache for Redis with Entra support)
+  - ACR: replace admin password pull with Managed Identity AcrPull role assignment
+  - Acceptance: Azure runtime uses managed identities for ACR, Postgres, Redis, and Key Vault; local docker-compose may keep local-only development credentials
+
+- Story M18.2: Azure Key Vault integration for remaining secrets (ADR-010)
+  - Provision Key Vault resource in IaC (Bicep or Terraform)
+  - Migrate: TradingView webhook secret, OpenAI API key, Kraken API keys → Key Vault secrets
+  - Rotate OpenAI API key immediately before storing the replacement in Key Vault
+  - Use Key Vault references in App Service config (no SDK calls in application code)
+  - Enable Key Vault soft-delete and purge protection
+  - Set RBAC model (not access policies) — grant Managed Identity `Key Vault Secrets User` role
+  - Acceptance: `terraform.tfvars`, `parameters.local.json`, and Terraform state contain no real secret values; secrets are populated out-of-band or imported with state protection explicitly documented
+
+- Story M18.3: Network isolation — VNet integration and private endpoints (ADR-011)
+  - Create VNet with workload egress subnet(s) for App Service and ACI or the selected replacement host, plus `data-subnet` for private endpoints
+  - Add private endpoint for Azure Cache for Redis
+  - Add private endpoint for Azure Database for PostgreSQL Flexible Server
+  - Add NSG on `data-subnet` — deny all inbound except from the approved Azure workload subnet(s)
+  - Disable public network access on Redis and Postgres once private endpoints active
+  - Acceptance: `nmap` from public internet cannot reach Redis or Postgres ports; API and Worker still reach both stores through the private path
+
+- Story M18.4: Database least-privilege and encryption hardening (ADR-012)
+  - Create application-specific database role/principal with SELECT/INSERT/UPDATE/DELETE on required tables only (no DDL)
+  - Revoke `postgres` admin account from application connection strings
+  - Verify `require_secure_transport=on` on PostgreSQL Flexible Server and set client connection `Ssl Mode=Require`
+  - Enable `pgaudit` extension for database activity logging
+  - Enable transparent data encryption (TDE) — on by default on Azure PG, verify and document
+  - Acceptance: Azure app connects as its managed identity database principal; local-only `appuser` is permitted only for docker-compose development; admin account unusable from app containers
+
+- Story M18.5: Microsoft Defender for Cloud and centralized monitoring (ADR-013)
+  - Enable Defender for Cloud Foundational CSPM (free tier) on the subscription
+  - Enable Defender for Containers — covers ACR vulnerability scanning and runtime protection
+  - Enable Defender for Databases — covers PostgreSQL threat detection
+  - Configure diagnostic settings: App Service logs + ACI container logs + PostgreSQL logs → Log Analytics workspace
+  - Create Log Analytics workspace; connect Prometheus remote-write to Azure Monitor
+  - Set up Azure Monitor alert: failed KillSwitch DB calls → PagerDuty or email
+  - Acceptance: Defender CSPM score visible; at least one alert fired successfully in test
+
+- Story M18.6: DevOps security pipeline (ADR-014)
+  - Extend the existing `.github/workflows/ci.yml` restore/build/test workflow rather than replacing it blindly
+  - Add `dotnet list package --vulnerable --include-transitive` as CI gate — fail on critical/high
+  - Add Trivy container scan step in Docker build CI — fail on critical CVEs
+  - Add secret scanning: GitHub Advanced Security or `trufflehog` on every PR
+  - Pin GitHub Actions to reviewed version tags or commit SHAs; do not use mutable `@main` or `@master`
+  - Upload SARIF results for both API and Worker container scans
+  - Pin all `FROM` base images to SHA digest in Dockerfiles (not just version tags)
+  - Add Dependabot config for NuGet and Docker base images
+  - Acceptance: CI pipeline fails if any critical vulnerability found in packages or containers
+
+- Story M18.7: Container security hardening (ADR-015)
+  - Add `USER` directive to Dockerfile and Dockerfile.worker (non-root `appuser`, UID 1000)
+  - Add `HEALTHCHECK` instruction to both Dockerfiles
+  - Pin all docker-compose images to exact versions (no `:latest`)
+  - Add read-only root filesystem where supported by the local and selected Azure container host
+  - Drop all Linux capabilities where the runtime supports it; document App Service/ACI limitations instead of forcing unsupported settings
+  - Acceptance: `docker inspect` shows non-root user; `:latest` absent from docker-compose.yml
+
+- Story M18.8: AI security posture — OpenAI and local LLM hardening (ADR-016)
+  - Rotate OpenAI API key immediately, then store only the replacement in Key Vault
+  - Scope OpenAI API key to minimum permissions (no fine-tuning, no image gen)
+  - Add request/response logging for all LLM calls (audit trail — token counts, latency, truncated prompt)
+  - Implement per-call spend limit via OpenAI API usage tier settings
+  - Document prompt injection threat model for adjudication and confluence scoring use cases
+  - Acceptance: LLM audit log populated in Log Analytics; old API key revoked
+
+- Story M18.9: Backup and recovery plan (ADR-017, informational)
+  - Enable automated backups on PostgreSQL Flexible Server (7-day retention minimum)
+  - Enable Azure Backup for Redis (Basic SKU does not support backup — document upgrade path)
+  - Write runbook: database restore procedure with RTO/RPO targets
+  - Acceptance: restore drill performed successfully; runbook merged to `docs/`
+
+**Done when**: Defender CSPM score > 70%; zero critical container CVEs in CI; no plaintext secrets in IaC or Terraform state; non-root containers; all ADR-009–ADR-018 reviewed.
+**Status**: Backlog | ADRs PROPOSED — require review before implementation
+**Dependencies**: M18.0 is a hard blocker for M18.1-M18.5 Azure resource changes; M18.10 secret rotation/history cleanup and OpenAI key rotation are immediate owner actions; M18.1 (Managed Identity) must precede production Key Vault references in M18.2; M18.3 (VNet) must precede public network lockdown in M18.4
+
+- Story M18.10: Git history secret removal — TradingView webhook secret (ADR-018)
+  - **Pre-requisite**: Rotate the TradingView webhook secret FIRST in TradingView settings before rewriting history (the old secret is compromised by its git exposure)
+  - Install `git-filter-repo` (`brew install git-filter-repo`)
+  - Rewrite history to replace the secret value with `REDACTED` in all commits
+  - Force-push all branches to GitHub remote (`git push --force --all`)
+  - Ask GitHub Support to run garbage collection to purge dangling objects from their CDN cache
+  - Enable GitHub Secret Push Protection on the repository to prevent future accidents
+  - Acceptance: `git log --all -p | grep "1b0a08c4"` returns zero results; new webhook secret is active in production
