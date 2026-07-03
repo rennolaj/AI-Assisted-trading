@@ -1,613 +1,169 @@
-# AI-Assisted-trading
-This repository contains everything about my own AI assisted trading server.
+# AI-Assisted Trading Backend
 
-## Tooling
-- .NET SDK: 10.0.x (installed via Homebrew cask `dotnet-sdk`)
-- Scripts: `scripts/restore.sh`, `scripts/build.sh`, `scripts/test.sh`
+> .NET 10 event-driven trading backend prototype — TradingView webhook ingestion, Redis queueing, PostgreSQL persistence, Elliott Wave analysis, risk-based position sizing, Kraken Futures demo execution, OpenTelemetry metrics, reconciliation, and emergency kill-switch controls.
 
-## Multi-Agent Setup (Any Feature)
-
-Two fully separate multi-agent pipelines are available — one for **Codex** (original), one for **Claude / GitHub Copilot CLI** (recommended for Claude users). Both share the same handoff bus contract and backlog.
-
-### Branch model (both setups)
-
-Every feature uses **one branch**: `feature/<scope>`.  
-All agents work on the same branch. Only the builder commits.  
-After committing, the builder saves a diff artifact:
-```bash
-git diff main..HEAD > /tmp/multi-agent-sync/<scope>/outbox/builder.diff
-```
-Reviewer, quality, and integrator read this file — they never switch branches.
+**Status**: Demo mode — connected to Kraken Futures sandbox. No live capital.
 
 ---
 
-### Claude / GitHub Copilot CLI (recommended)
+## Architecture
 
-Driven by:
-- `CLAUDE.md` — auto-read by Claude; defines roles, M14 anti-pattern rules, C# 14 / .NET 10 standards mandate
-- `claude-orchestrator.yaml` — Claude project config
-- `scripts/agents/bootstrap-feature-claude.sh`
-- `scripts/agents/run-feature-once-claude.sh`
-- `scripts/agents/create-followup-bugs.sh`
-- `docs/DRY_RUN_CHECKLIST_CLAUDE.md`
-
-#### Communication model
-
-Agent coordination is through `/tmp/multi-agent-sync/<scope>`:
-- `context.md` — shared feature context (you write this)
-- `inbox/<role>.md` — role instructions
-- `outbox/<role>.md` — human-readable reports
-- `outbox/<role>.json` — machine-readable findings
-- `outbox/builder.diff` — unified diff for review (no branch switching needed)
-- `state/<role>.done` — stage completion markers
-
-#### Stage order
-
-1. `planner` — deterministic plan
-2. `rubber-duck` — plan critique (Claude-native, catches design flaws early)
-3. `builder` — implements, commits, saves diff
-4. `reviewer` + `quality` — parallel, both read `builder.diff`
-5. `tester` — runs full test suite
-6. `integrator` — validates dataflow contracts
-7. `orchestrator` — final GO / NO-GO decision
-
-Stages are sequenced via `task` tool agents + `read_agent(wait:true)` — no tmux or shell polling.
-
-#### Quickstart
-
-1. Bootstrap the sync bus and feature branch:
-```bash
-./scripts/agents/bootstrap-feature-claude.sh \
-  --scope <feature-scope-id> \
-  --base main
+```
+TradingView alert
+      │
+      ▼
+ASP.NET Core 10 API          idempotency check · payload normalization · 3s ACK
+      │
+      ├──► PostgreSQL          raw alert + audit trail
+      ▼
+  Redis queue
+      │
+      ▼
+  AlertWorker (BackgroundService)
+      │
+      ├──► Indicator Engine    RSI · MACD · StochRSI · Volume  (M5/M15/M30/H1/H2)
+      ├──► Elliott Wave Engine ZigZag pivots · candidate generation · rule checks
+      │
+      ▼
+  Adjudication Gate           deterministic rule engine  (LLM advisory layer: M16/M17)
+      │
+   ALLOW ──► Risk Engine ──► TradePlan ──► Execution Service ──► Kraken Futures (demo)
+   REJECT ──────────────────────────────────────────────────────► PostgreSQL audit
+                                                                       ▲
+                                                         Reconciliation Worker  60s
 ```
 
-2. Write the feature context:
-```bash
-nano /tmp/multi-agent-sync/<feature-scope-id>/context.md
-```
-
-3. Generate the orchestration prompt (paste into Copilot CLI session):
-```bash
-./scripts/agents/run-feature-once-claude.sh --scope <feature-scope-id>
-```
-
-4. In your Copilot CLI session, Claude acts as orchestrator — it will:
-   - Launch each stage as a background `task` agent
-   - Receive completion notifications automatically
-   - Gate each stage before proceeding
-
-5. After completion, optionally generate follow-up backlog bugs:
-```bash
-./scripts/agents/create-followup-bugs.sh --scope <feature-scope-id>
-```
-
-#### Observability
-
-| What you want | Command |
-|---|---|
-| See all running agents | `list_agents` (in Copilot CLI) |
-| Read a completed agent | `read_agent(agent_id=..., wait=true)` |
-| Check outbox reports | `ls /tmp/multi-agent-sync/<scope>/outbox/` |
-| Check stage completion | `ls /tmp/multi-agent-sync/<scope>/state/` |
-
-#### Dry run before real work
-
-Before using on a real feature, validate the setup:
-```bash
-./scripts/agents/bootstrap-feature-claude.sh \
-  --scope dryrun-claude-doc-only \
-  --base main \
-  --no-branches
-```
-See `docs/DRY_RUN_CHECKLIST_CLAUDE.md` for the full pass criteria checklist.
+See [Architecture Reference](docs/architecture.md) for the full component map, persistence model, and design decisions.
 
 ---
 
-### Codex / AO (original)
+## Key Features
 
-Driven by:
-- `AGENTS.md` — multi-agent contract for Codex
-- `agent-orchestrator.yaml` — AO project config
-- `scripts/agents/bootstrap-feature.sh`
-- `scripts/agents/run-feature-once-ao.sh`
-- `scripts/agents/create-followup-bugs.sh`
-- `DRY_RUN_CHECKLIST.md`
-
-#### Communication model
-- Agent terminals are managed by `tmux`.
-- Agent coordination is through `/tmp/multi-agent-sync/<scope>`:
-  - `context.md`: shared feature context
-  - `inbox/<agent>.md`: role instructions
-  - `outbox/<agent>.md`: role outputs
-  - `outbox/builder.diff`: unified diff from builder commit
-  - `state/<agent>.done`: stage completion markers
-
-#### Stage order
-1. `planner`
-2. `builder`
-3. `reviewer` + `quality` (parallel)
-4. `tester`
-5. `integrator`
-6. `orchestrator` final decision
-
-#### AO integration (recommended for Codex)
-
-Prerequisites:
-- AO CLI installed and available as `ao`
-- `agent-orchestrator.yaml` in repo root
-- `defaults.agent: codex` in `agent-orchestrator.yaml`
-- `tmux` installed
-
-Activation steps:
-
-1. Start AO dashboard + orchestrator:
-```bash
-ao start
-```
-
-2. Bootstrap feature contract files and feature branch:
-```bash
-./scripts/agents/bootstrap-feature.sh \
-  --scope <feature-scope-id> \
-  --base main
-```
-
-3. Write the feature context:
-```bash
-nano /tmp/multi-agent-sync/<feature-scope-id>/context.md
-```
-
-4. Run AO-based multi-agent pass:
-```bash
-./scripts/agents/run-feature-once-ao.sh --scope <feature-scope-id>
-```
-
-Optional — include automatic backlog follow-up bug generation:
-```bash
-./scripts/agents/run-feature-once-ao.sh \
-  --scope <feature-scope-id> \
-  --followup-bugs
-```
-
-5. Inspect/operate:
-```bash
-ao status
-ao session ls
-```
-
-6. Attach to sessions:
-- The AO runner prints all `tmux attach -t <name>` targets after spawning.
-
-7. Cleanup:
-```bash
-ao session kill <session-id>
-# or stop everything:
-ao stop AI-Assisted
-```
-
-#### Legacy tmux-only flow (no AO)
-
-1. Start clean (optional but recommended):
-```bash
-/opt/homebrew/bin/tmux kill-server
-```
-
-2. Bootstrap a feature scope:
-```bash
-./scripts/agents/bootstrap-feature.sh \
-  --scope <feature-scope-id> \
-  --base main \
-  --with-tmux \
-  --force
-```
-
-3. Set shared context:
-```bash
-nano /tmp/multi-agent-sync/<feature-scope-id>/context.md
-```
-
-4. Dispatch one coordinated run:
-```bash
-./scripts/agents/run-feature-once.sh \
-  --scope <feature-scope-id> \
-  --session multi-agent-<feature-scope-id>
-```
-
-5. Observe and monitor:
-```bash
-tmux attach -t multi-agent-<feature-scope-id>
-```
-- Window `6` is the monitor.
-- `state/*.done` indicates stage completion.
-- `outbox/*.md` contains each agent report.
+| Feature | Details |
+|---------|---------|
+| Webhook ingestion | TradingView Pine Script → `POST /webhooks/tradingview/{secret}`, idempotency by key, 3s ACK |
+| Multi-timeframe indicators | RSI, MACD, StochRSI, Volume across M5/M15/M30/H1/H2 — deterministic, fixture-tested |
+| Elliott Wave analysis | ZigZag pivot extraction, candidate generation with rule violations and W3/W5END labelling |
+| Deterministic gate | 4-rule adjudication engine in pure C# — no LLM on the critical execution path (ADR-001) |
+| Risk engine | Policy-driven position sizing, stop-loss anchoring, multi-target take-profit |
+| Kill switch | Three levels: `PAUSE_NEW` / `PAUSE_ALL` / `EMERGENCY_STOP` — persisted, audited |
+| Reconciliation | Background worker cross-checks internal state with Kraken exchange state every 60s |
+| Observability | OpenTelemetry → Prometheus → Grafana; `/health`, `/health/dependencies`, `/health/ready` |
+| Demo execution | Kraken Futures sandbox — entry, stop-loss, and take-profit orders placed and tracked |
 
 ---
 
-### Shared policies (both setups)
+## Quick Start
 
-- `NO_PUSH`: no `git push` — the human decides when to push
-- `INFRA_FREEZE`: no Terraform/Bicep modifications
-- `SCOPE`: all changes stay inside the declared feature scope
-- `BUILD_GATE`: builder must pass `./scripts/build.sh` before marking done
-- `TEST_GATE`: builder must pass `./scripts/test.sh` before marking done
-- `SKILL_REF`: all agents must read `docs/csharp-dotnet10-skill.md` before writing C#
-- `ANTI_PATTERN`: all agents must check M14 anti-patterns in `CLAUDE.md` / `AGENTS.md`
-
-### Backlog follow-up bug policy
-
-If `reviewer`, `quality`, or `integrator` report blocking findings, a backlog bug is auto-added:
 ```bash
-./scripts/agents/create-followup-bugs.sh --scope <feature-scope-id>
-```
-Auto-added bugs are marked `PRIORITY: NEXT_ITERATION`. Marker format:
-- `AUTOBUG:<scope>:reviewer`
-- `AUTOBUG:<scope>:quality`
-- `AUTOBUG:<scope>:integrator`
-
-### Troubleshooting
-
-**Claude setup:**
-- If an agent task gets stuck: check `list_agents` in Copilot CLI; use `read_agent` to see partial output
-- If builder diff is empty: ensure builder actually made commits before running `git diff main..HEAD`
-- If quality gate fails on M14 patterns: check `CLAUDE.md` anti-pattern section for the exact rule
-
-**Codex/AO setup:**
-- If `watch` is not installed on macOS: scripts automatically use a portable `while` loop fallback
-- If an agent appears stuck: inspect pane output in tmux; restart only that stage
-- If using AO and a session gets stuck: check `ao status`; send corrective instruction with `ao send <session> "<message>"`
-- If reviewer/quality do not see builder changes: ensure `outbox/builder.diff` was written correctly
-- If you need to re-run backlog bug generation manually: `./scripts/agents/create-followup-bugs.sh --scope <scope>`
-
-## Quick start
-```bash
+# Install .NET SDK (macOS)
 brew install --cask dotnet-sdk
+
+# Build and test
 ./scripts/restore.sh
 ./scripts/build.sh
 ./scripts/test.sh
-```
 
-## Docker
-
-### Quick Start (Local Development)
-```bash
+# Run locally with Docker
 cp .env.example .env
 docker compose up --build
 ```
 
-### Production Deployment
+> `build.sh` installs and starts PostgreSQL + Redis locally by default. Set `DEV_BOOTSTRAP=0` to skip if you manage these services yourself.
 
-For complete production deployment with `.env.prod.local`, see the **[Production Deployment Guide](docs/production-deployment-guide.md)** for step-by-step instructions including:
-- Container build and startup procedures
-- Database initialization and health checks
-- Service verification and monitoring
-- TradingView webhook configuration
-- LLM provider setup (OpenAI, Local, or Auto-fallback)
-- Troubleshooting common issues
+See [Local Development](docs/local-development.md) for Docker, TradingView webhook testing (ngrok), smoke tests, and fixture capture.
 
-### With TradingView Webhook Access (ngrok)
-```bash
-# Copy and configure environment
-cp .env.demo .env.demo.local
-nano .env.demo.local  # Add NGROK_AUTHTOKEN and other credentials
+---
 
-# Start with ngrok enabled
-docker compose --env-file .env.demo.local --profile ngrok up --build -d
+## Documentation
 
-# Get your webhook URL
-./scripts/get-ngrok-url.sh
-```
+| Topic | |
+|-------|-|
+| [Architecture overview](docs/architecture.md) | Component map, data flow, persistence model, design decisions |
+| [Local development](docs/local-development.md) | Build, Docker, ngrok, smoke test, fixture capture |
+| [Configuration reference](docs/configuration.md) | All runtime config keys by section |
+| [Environment files](docs/environment-files.md) | `.env.*` file guide — what goes where |
+| [Production deployment](docs/production-deployment-guide.md) | Docker build, DB init, health checks, LLM setup |
+| [Kill switch operations](docs/m7.2-kill-switch-operations.md) | Emergency stop procedures and API reference |
+| [Metrics and observability](docs/m7.3-metrics-guide.md) | Prometheus metrics catalog and Grafana query examples |
+| [ngrok webhook setup](docs/ngrok-quickstart.md) | TradingView webhook tunnel configuration |
+| [Architecture Decision Records](docs/adr/ADR-000-index.md) | ADR-001–ADR-018: LLM architecture, Azure security, git hygiene |
+| [**Backlog / Roadmap**](docs/backlog.md) | All milestones M0–M19: status, stories, effort estimates |
+| [Development agent pipeline](docs/dev-agents.md) | Multi-agent feature workflow (Claude / Codex) |
 
-See [ngrok Quick Start](docs/ngrok-quickstart.md) for complete webhook setup.
+---
 
-### Configuration
+## Roadmap and Known Limitations
 
-Set `KRAKEN_FUTURES_ENV=demo` (sandbox) or `KRAKEN_FUTURES_ENV=prod` (live) in `.env` to switch Kraken Futures environments.
-Endpoint defaults live in `config/kraken-futures.json`.
-Set `OPENAI_API_KEY` in `.env` for MCP adjudication (keep it local, never commit secrets).
-Set `MCP_PROVIDER=openai|local|auto` to choose OpenAI, a local LLM, or OpenAI with local fallback on 429.
-When using a local LLM, configure `LOCAL_LLM_BASE_URL` and optionally `LOCAL_LLM_MODEL_OVERRIDE`.
-For LM Studio, use `LOCAL_LLM_BASE_URL=http://host.docker.internal:1234/v1/` and `LOCAL_LLM_MODE=chat`.
-See `docs/local-llm-options.md` for local runtime/model notes.
+Full backlog with story-level detail: [docs/backlog.md](docs/backlog.md).
 
-**Complete environment file documentation:** [Environment Files Guide](docs/environment-files.md)
+Pending items of note:
 
-### Environment Switching for Docker
-For safe environment management (simulated/demo/prod), use the environment switcher:
+| Area | Story |
+|------|-------|
+| LLM adjudication → deterministic engine | M16 |
+| LLM advisory layer for confluence scoring | M17 |
+| AlertWorker refactor into domain services | M14.9.1 |
+| Redis at-least-once delivery (list → Streams) | M19.6 |
+| String `StartsWith("ALLOW")` → closed enum | M19.2 |
+| Azure Key Vault, Managed Identity, VNet | M18 |
+| Worker and webhook integration tests | M14.7 |
+| CancellationToken propagation (14+ files) | M14.4 |
 
-```bash
-# Switch to simulated environment
-./scripts/switch-env.sh simulated
+**Scope note**: This is a backend prototype, not a production trading system. There are no backtests, no PnL attribution, no Sharpe ratio, no slippage model. Execution is demo-only until M18 hardening is complete.
 
-# Update .env to match (docker-compose environment variable)
-# For simulated, set: KRAKEN_FUTURES_ENV=demo (uses simulated mode internally)
-# Then rebuild containers
-docker compose up --build
-```
+---
 
-```bash
-# Switch to demo environment
-./scripts/switch-env.sh demo
+## Kill Switch
 
-# Update .env to match
-# Set: KRAKEN_FUTURES_ENV=demo
-docker compose up --build
-```
+Three-level emergency control, checked before every execution:
 
 ```bash
-# Switch to production (requires CONFIRM=yes)
-CONFIRM=yes ./scripts/switch-env.sh prod
-
-# Update .env to match
-# Set: KRAKEN_FUTURES_ENV=prod
-docker compose up --build
-```
-
-⚠️ **Important**: The switch-env.sh script updates `config/execution.json` which is copied into the Docker image at build time. Always rebuild containers after switching environments. See `docs/environment-switching.md` for detailed guidance and safety checklists.
-
-## Smoke test (ngrok)
-This uses `scripts/smoke.sh` plus a local `.env.smoke` file (not committed).
-
-1) Create `.env.smoke` with your TradingView secret and smoke inputs:
-```bash
-TRADINGVIEW_WEBHOOK_SECRET=your-secret-here
-SYMBOL_HINT=BTCUSD.P
-TICKER=BTCUSD.P
-EXCHANGE=krakenfutures
-INTERVAL=1
-KRAKEN_FUTURES_ENV=demo
-KRAKEN_FUTURES_DEMO_API_KEY=your-demo-key
-KRAKEN_FUTURES_DEMO_API_SECRET=your-demo-secret
-SLEEP_SECONDS=3
-SMOKE_TIMEOUT_SECONDS=300
-NGROK_AUTOSTART=1
-```
-
-2) Start API + worker using the smoke env file (does not touch dev config):
-```bash
-docker compose --env-file .env.smoke up -d --build api worker
-```
-
-3) The script will start ngrok automatically (port 8080) and stop it after the timeout.
-
-4) In TradingView, load `tests/pineScript/mvp-smoke-test-alerts.pine` and create an alert:
-- Webhook URL: `https://your-ngrok-host.ngrok-free.dev/webhooks/tradingview/your-secret-here`
-- Message: `{{alert_message}}`
-- Condition: "Any alert() function call"
-
-5) Run the smoke test:
-```bash
-./scripts/smoke.sh
-```
-
-Health checks:
-- `http://localhost:8080/health`
-- `http://localhost:8080/health/dependencies`
-
-Trade monitoring seed:
-- `POST http://localhost:8080/trades/open`
-Example:
-```bash
-curl -X POST http://localhost:8080/trades/open \
-  -H "Content-Type: application/json" \
-  -d '{"exchangeId":"kraken-futures","symbol":"BTCUSD.P","side":"LONG","entryPrice":70000,"invalidationPrice":68000}'
-```
-
-## Kill Switch (Emergency Controls)
-The system includes a three-level kill switch for emergency halting of trading operations:
-
-**Kill Switch Levels:**
-- `PAUSE_NEW`: Stops only new alert processing (prevents new trades)
-- `PAUSE_ALL`: Pauses all background workers (alerts, reconciliation, monitoring)
-- `EMERGENCY_STOP`: Cancels all open orders and pauses all operations
-
-**API Endpoints:**
-```bash
-# Check kill switch status (no authentication required)
-curl http://localhost:8080/api/killswitch/status
-
-# Activate kill switch
+# Activate
 curl -X POST http://localhost:8080/api/killswitch/activate \
   -H "Content-Type: application/json" \
-  -d '{
-    "secret": "your-secret-here",
-    "level": "EMERGENCY_STOP",
-    "reason": "Market conditions require immediate halt",
-    "activatedBy": "operator-name"
-  }'
+  -d '{"secret":"<KILL_SWITCH_SECRET>","level":"EMERGENCY_STOP","reason":"...","activatedBy":"operator"}'
 
-# Deactivate kill switch
+# Deactivate
 curl -X POST http://localhost:8080/api/killswitch/deactivate \
   -H "Content-Type: application/json" \
-  -d '{
-    "secret": "your-secret-here",
-    "deactivatedBy": "operator-name",
-    "reason": "Issue resolved"
-  }'
+  -d '{"secret":"<KILL_SWITCH_SECRET>","deactivatedBy":"operator","reason":"..."}'
+
+# Status (no auth)
+curl http://localhost:8080/api/killswitch/status
 ```
 
-**Configuration:**
-Set `KILL_SWITCH_SECRET` environment variable (or `KillSwitchApi:Secret` in config):
+Levels: `PAUSE_NEW` (new alerts only) · `PAUSE_ALL` (all workers) · `EMERGENCY_STOP` (cancel orders + pause).
+State persists in `system_state`; all activations audited in `kill_switch_audit`.
+See [Kill Switch Operations](docs/m7.2-kill-switch-operations.md).
+
+---
+
+## Observability
+
 ```bash
-export KILL_SWITCH_SECRET="your-secure-secret-here"
+curl http://localhost:8080/health               # liveness
+curl http://localhost:8080/health/dependencies  # Postgres + Redis
+curl http://localhost:8080/metrics              # Prometheus (API)
+curl http://localhost:9464/metrics              # Prometheus (Worker)
 ```
 
-**Worker Behavior:**
-- Workers check kill switch before each processing iteration
-- When paused, workers log status and continue health checks
-- EMERGENCY_STOP cancels all open orders before pausing
-- State persists in PostgreSQL `system_state` table
-- All actions are audited in `kill_switch_audit` table
+Prometheus UI: http://localhost:9090 · Grafana: http://localhost:3000
 
-**Monitoring:**
-```sql
--- Check current status
-SELECT * FROM system_state WHERE key = 'kill_switch';
+See [Metrics Guide](docs/m7.3-metrics-guide.md).
 
--- View audit history
-SELECT * FROM kill_switch_audit ORDER BY ts DESC LIMIT 20;
-```
+---
 
-See `docs/m7.2-kill-switch-operations.md` for emergency procedures.
+## Development Workflow
 
-## Observability & Metrics
+Features go through a 7-stage multi-agent review pipeline: planner → rubber-duck → builder → (reviewer + quality) → tester → integrator → orchestrator.
 
-The system exposes OpenTelemetry metrics for monitoring and observability.
-
-**Metrics Endpoints:**
 ```bash
-# API metrics (Prometheus format)
-curl http://localhost:8080/metrics
+# Bootstrap a feature
+./scripts/agents/bootstrap-feature-claude.sh --scope <feature-id> --base main
 
-# Worker metrics (Prometheus format)
-curl http://localhost:9464/metrics
+# Generate orchestration prompt
+./scripts/agents/run-feature-once-claude.sh --scope <feature-id>
 ```
 
-**Health Check Endpoints:**
-```bash
-# Basic health check
-curl http://localhost:8080/health
-
-# Dependency health (Postgres, Redis)
-curl http://localhost:8080/health/dependencies
-
-# Kubernetes readiness probe
-curl http://localhost:8080/health/ready
-
-# Kubernetes liveness probe
-curl http://localhost:8080/health/live
-```
-
-**Prometheus & Grafana:**
-When running with docker-compose, Prometheus and Grafana are automatically configured:
-- **Prometheus UI**: http://localhost:9090
-  - Pre-configured to scrape API (port 8080) and Worker (port 9464)
-  - 15-second scrape interval
-- **Grafana UI**: http://localhost:3000
-  - Default credentials: `admin` / `admin`
-  - Prometheus datasource pre-configured
-  - Create custom dashboards to visualize metrics
-
-**Key Metrics:**
-- `alerts_received_total` - Counter of alerts received (by exchange, symbol)
-- `alerts_processed_total` - Counter of alerts processed (by outcome)
-- `alert_processing_duration_seconds` - Histogram of processing duration
-- `queue_depth` - Gauge of current Redis queue depth
-- `orders_placed_total` - Counter of orders placed (by direction, type)
-- `orders_filled_total` - Counter of filled orders
-- `active_trades` - Gauge of currently open positions
-- `errors_total` - Counter of errors (by component, type)
-
-See `docs/m7.3-metrics-guide.md` for complete metrics catalog and Prometheus query examples.
-
-## Reconciliation System
-The system continuously monitors order state consistency between internal tracking and exchange state:
-
-**Automatic Detection:**
-- Runs every 60 seconds via background worker (configurable via `Reconciliation:IntervalSeconds`)
-- Detects 6 types of discrepancies:
-  - `MISSING_ON_EXCHANGE`: Order placed internally but not found on exchange
-  - `ORPHANED_ON_EXCHANGE`: Order exists on exchange but not tracked internally
-  - `STATUS_MISMATCH`: Order status differs between internal and exchange state
-  - `FILL_MISMATCH`: Fill quantity/price discrepancies
-  - `INVALIDATION_TRIGGERED`: Stop-loss/take-profit triggered but not reflected in status
-  - `ERROR`: Reconciliation process errors
-
-**Manual Resolution:**
-When discrepancies are detected, review them in the database:
-```sql
--- View recent discrepancies
-SELECT * FROM reconciliation_discrepancy 
-WHERE detected_at > NOW() - INTERVAL '1 hour'
-ORDER BY detected_at DESC;
-
--- Check reconciliation state
-SELECT * FROM reconciliation_state 
-ORDER BY checked_at DESC LIMIT 10;
-```
-
-**Resolution Steps:**
-1. Investigate the discrepancy details (stored as JSON in `expected_state` and `actual_state` columns)
-2. Verify the actual exchange state using exchange UI or API
-3. Take corrective action:
-   - Cancel orphaned orders on exchange
-   - Update internal state to match exchange reality
-   - Re-submit missing orders if appropriate
-4. Monitor subsequent reconciliation runs to ensure resolution
-
-See `docs/m7-low-level-requirements.md` for detailed technical specifications.
-
-## Kraken integration tests
-These are disabled by default. To run them against demo endpoints:
-```bash
-export KRAKEN_FUTURES_INTEGRATION_TESTS=1
-export KRAKEN_FUTURES_REST_BASE=https://demo-futures.kraken.com/derivatives/api/v3
-export KRAKEN_FUTURES_TEST_SYMBOL=BTCUSD.P
-./scripts/test.sh
-```
-
-## Fixture capture (Kraken Futures history)
-Capture real trade history and aggregate into candles for tests:
-```bash
-SYMBOL=PF_ETHUSD INTERVAL_MINUTES=1 DURATION_SECONDS=600 \
-  ./scripts/fixtures/capture-futures-history.sh
-```
-The output defaults to `tests/fixtures/kraken-futures/<symbol>_m<interval>.json`.
-
-## Runtime configuration
-- `TradingView:WebhookSecret`
-- `Postgres:ConnectionString`
-- `Redis:ConnectionString`
-- `Redis:AlertQueueKey` (default: `mvp:alerts`)
-- `OpenAI:ApiKey`
-- `OpenAI:BaseUrl`
-- `OpenAI:Organization`
-- `OpenAI:Project`
-- `McpProvider:Provider`
-- `McpProvider:FallbackOnOpenAi429`
-- `LocalLlm:BaseUrl`
-- `LocalLlm:ApiKey`
-- `LocalLlm:ResponsesPath`
-- `LocalLlm:ChatCompletionsPath`
-- `LocalLlm:Mode`
-- `LocalLlm:UseResponseFormat`
-- `LocalLlm:ModelOverride`
-- `Worker:PollIntervalMs`
-- `Reconciliation:IntervalSeconds` (default: 60)
-- `KillSwitchApi:Secret` (required for activate/deactivate endpoints)
-- `KrakenFutures:Environment`
-- `KrakenFutures:BaseUrl`
-- `KrakenFutures:AuthBaseUrl`
-- `KrakenFutures:WebSocketUrl`
-- `KrakenFutures:TestSymbol`
-- `KrakenFutures:ApiKey`
-- `KrakenFutures:ApiSecret`
-- `KrakenFutures:DemoApiKey`
-- `KrakenFutures:DemoApiSecret`
-- `KrakenFutures:ProdApiKey`
-- `KrakenFutures:ProdApiSecret`
-- `KrakenFutures:TimeoutSeconds`
-- `KrakenFutures:Cache:InstrumentsTtlSeconds`
-- `KrakenFutures:Cache:TickersTtlSeconds`
-- `KrakenFutures:Cache:CandlesTtlSeconds`
-- `KrakenFutures:RateLimit:MaxCostPerWindow`
-- `KrakenFutures:RateLimit:WindowSeconds`
-- `KrakenFutures:RateLimit:InstrumentsCost`
-- `KrakenFutures:RateLimit:TickersCost`
-- `KrakenFutures:RateLimit:CandlesCost`
-- `Elliott:BaseTimeframe`
-- `Elliott:Parameters:PivotMethod`
-- `Elliott:Parameters:Depth`
-- `Elliott:Parameters:DeviationPct`
-- `Elliott:Parameters:MaxCandidates`
-- `Elliott:TickSizeFallback`
-- `Elliott:TickSizeOverrides` (per-symbol overrides, e.g. `Elliott:TickSizeOverrides:BTCUSD.P=0.5`)
-
-## Local services
-`./scripts/build.sh` will install and start Postgres/Redis and create the `ai-trading-db` database by default. To disable, set `DEV_BOOTSTRAP=0`.
-On Linux, `scripts/dev/bootstrap.sh` uses `apt-get` and may require `sudo`. If your Postgres uses a non-default superuser, set `PG_USER`.
-
-## Container notes
-When running in containers, set connection strings via environment variables so the API can reach sibling Postgres/Redis containers on the same network, for example:
-`Postgres__ConnectionString=Host=postgres;Port=5432;Database=ai-trading-db;Username=postgres;Password=postgres`
-`Redis__ConnectionString=redis:6379`
+See [Development Agent Pipeline](docs/dev-agents.md) for full setup, stage order, and troubleshooting.

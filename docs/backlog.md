@@ -1356,11 +1356,61 @@ Return: {"confluenceScore": 0.0-1.0, "alignedTimeframes": [...], "concerns": [..
 **Status**: Backlog | ADRs PROPOSED — require review before implementation
 **Dependencies**: M18.0 is a hard blocker for M18.1-M18.5 Azure resource changes; M18.10 secret rotation/history cleanup and OpenAI key rotation are immediate owner actions; M18.1 (Managed Identity) must precede production Key Vault references in M18.2; M18.3 (VNet) must precede public network lockdown in M18.4
 
-- Story M18.10: Git history secret removal — TradingView webhook secret (ADR-018)
-  - **Pre-requisite**: Rotate the TradingView webhook secret FIRST in TradingView settings before rewriting history (the old secret is compromised by its git exposure)
-  - Install `git-filter-repo` (`brew install git-filter-repo`)
-  - Rewrite history to replace the secret value with `REDACTED` in all commits
-  - Force-push all branches to GitHub remote (`git push --force --all`)
-  - Ask GitHub Support to run garbage collection to purge dangling objects from their CDN cache
-  - Enable GitHub Secret Push Protection on the repository to prevent future accidents
-  - Acceptance: `git log --all -p | grep "1b0a08c4"` returns zero results; new webhook secret is active in production
+- Story M18.10: Git history secret removal — TradingView webhook secret (ADR-018) ✅ DONE
+  - Rotated TradingView webhook secret before history rewrite
+  - Used `git-filter-repo` to replace secret value with `REDACTED_WEBHOOK_SECRET` in all 6 affected commits
+  - Pushed clean history to new public repo: https://github.com/rennolaj/AI-Assisted-trading
+  - Acceptance: `git log --all -p | grep "1b0a08c4"` returns zero results on the public repo ✅
+
+---
+
+### M19 — Codebase Quality Cleanup (from external technical review)
+
+**Goal**: Address concrete quality and maintainability findings from an external senior engineer review. No new features — this is laaghangend fruit that raises the professionalism bar for the public repo.
+
+**Background**: External roast review (2026-07-03) identified the following issues not already tracked in M14/M18. Items already tracked (AlertWorker god class → M14.9.1, LLM gate → M16, Redis fragility → M14.5, credentials → M14.8, container security → M18.7) are not duplicated here.
+
+#### Stories
+
+- Story M19.1 (HIGH): Fix duplicate project references in `Mvp.Trading.sln`
+  - `Mvp.Trading.Execution`, `Mvp.Trading.Contracts`, and `Mvp.Trading.Risk` each appear twice with different GUIDs
+  - First reference uses `{9A19103F}` (SDK-style), second uses `{FAE04EC0}` (legacy C# project type)
+  - Fix: remove the duplicate `{FAE04EC0}` entries; keep the SDK-style references
+  - Signal: duplicate entries tell any senior reviewer that the solution was auto-modified without cleanup
+  - Risk: LOW | Effort: ~15min
+
+- Story M19.2 (HIGH): Replace stringly-typed `StartsWith("ALLOW")` decisions with a closed `LlmDecisionType` enum
+  - `AlertWorker.cs:344` — `decision.StartsWith("ALLOW", StringComparison.OrdinalIgnoreCase)`
+  - `AlertWorker.cs:534` — `normalized.Contains("SHORT", StringComparison.OrdinalIgnoreCase)` for side derivation
+  - `TradePlanBuilder` — `Contains("LONG")` / `Contains("SHORT")` for direction extraction
+  - Fix: introduce `LlmDecisionType` enum (`AllowLongW3`, `AllowLongW5End`, `AllowShortW3`, `AllowShortW5End`, `Reject`) and parse once at deserialization boundary
+  - This also closes the ForceAllow synthetic decision security gap (`ALLOWLONGDEMO` bypasses the enum)
+  - Risk: LOW | Effort: ~2h
+
+- Story M19.3 (MEDIUM): Guard Swagger/OpenAPI behind `IsDevelopment()` in Program.cs
+  - `Program.cs:122-125` — `app.UseSwagger()` and `app.UseSwaggerUI()` always active
+  - Fix: wrap in `if (app.Environment.IsDevelopment())` block
+  - Risk: LOW | Effort: ~15min
+
+- Story M19.4 (MEDIUM): Fix webhook endpoint URL mismatch between docs and code
+  - Actual endpoint in `Program.cs`: `POST /webhooks/tradingview/{secret}` (secret in URL path)
+  - `docs/production-deployment-guide.md` references `/api/v1/tradingview/webhook` with secret in JSON body
+  - Fix: update production guide to show the actual endpoint, actual curl example, and actual secret placement
+  - Risk: LOW | Effort: ~30min
+
+- Story M19.5 (MEDIUM): Add Docker Compose production profile with hardened defaults
+  - `docker-compose.yml` uses `ASPNETCORE_ENVIRONMENT: Development`, default `changeme` webhook secret, default `postgres/postgres` credentials, and publishes all ports to `0.0.0.0`
+  - Fix: add a `docker-compose.prod.yml` override that sets `ASPNETCORE_ENVIRONMENT: Production`, removes default secrets (fail-fast if env vars not set), and restricts port bindings
+  - `docker-compose.yml` remains for local dev; `docker-compose.prod.yml` is the production overlay
+  - Risk: LOW | Effort: ~2h
+
+- Story M19.6 (LOW): Redis at-least-once delivery — migrate list queue to Redis Streams
+  - Currently: `ListRightPushAsync` / `ListLeftPopAsync` — pop is immediate delete, no ack
+  - A worker crash after LPOP but before successful processing silently drops the alert
+  - Fix: migrate to Redis Streams with consumer groups — pending entry list (PEL) provides at-least-once delivery and dead-letter visibility
+  - Alternative if Redis Streams adds complexity: PostgreSQL-backed outbox pattern
+  - Note: overlaps M14.5.2 (webhook 503 on Redis failure) but is a separate concern (delivery guarantee vs failure signalling)
+  - Risk: MEDIUM | Effort: ~8-12h
+
+**Done when**: .sln cleaned; enum decisions active; Swagger guarded; production doc accurate; prod Docker profile exists; Redis delivery guaranteed.
+**Status**: Backlog | Triggered by external review 2026-07-03
