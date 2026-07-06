@@ -37,7 +37,7 @@ tests/                          — xUnit test projects
 
 ## C# and .NET Standards
 
-**ALWAYS read `docs/csharp-dotnet10-skill.md` before making any C# or .NET decisions.**
+**ALWAYS read `docs/development/csharp-dotnet10-skill.md` before making any C# or .NET decisions.**
 It is the authoritative reference for this codebase covering:
 - All C# 12/13/14 language features with rules and code examples
 - .NET 10 runtime APIs (TimeProvider, Guid.CreateVersion7, Base64Url, SearchValues, Task.WhenEach, LINQ)
@@ -54,7 +54,7 @@ It is the authoritative reference for this codebase covering:
 
 ## M14 Anti-Patterns — DO NOT Introduce or Worsen
 
-These patterns were found during the M14 technical review and are tracked in `docs/backlog.md`.
+These patterns were found during the M14 technical review and are tracked in `docs/backlog/backlog.md`.
 Never introduce new instances of these anti-patterns when writing code for this repository.
 
 ### 🔴 CRITICAL — Financial / Security Risk
@@ -335,7 +335,7 @@ image: prom/prometheus:v2.53.0
 - **SCOPE**: keep changes inside the declared feature scope
 - **BUILD_GATE**: always verify `./scripts/build.sh` passes before marking done
 - **TEST_GATE**: always verify `./scripts/test.sh` passes before marking done
-- **SKILL_REF**: always read `docs/csharp-dotnet10-skill.md` before writing C# code
+- **SKILL_REF**: always read `docs/development/csharp-dotnet10-skill.md` before writing C# code
 
 Every agent output must end with:
 ```
@@ -455,7 +455,7 @@ Blocked items: none
 
 #### planner
 ```
-Read: context.md, inbox/planner.md, docs/csharp-dotnet10-skill.md, docs/backlog.md
+Read: context.md, inbox/planner.md, docs/development/csharp-dotnet10-skill.md, docs/backlog/backlog.md
 Produce:
   1. Exact list of files to create/modify with reason
   2. Implementation steps in order
@@ -468,7 +468,7 @@ Create: state/planner.done
 
 #### builder
 ```
-Read: context.md, inbox/builder.md, outbox/planner.md, docs/csharp-dotnet10-skill.md
+Read: context.md, inbox/builder.md, outbox/planner.md, docs/development/csharp-dotnet10-skill.md
 Do:
   1. Use bash tool to run: ./scripts/restore.sh
   2. Implement all changes using edit/create tools
@@ -489,7 +489,7 @@ Read: context.md, inbox/reviewer.md, outbox/builder.diff (primary), outbox/build
 Do NOT checkout any branch or make any commits.
 Do:
   1. Review outbox/builder.diff — the full unified diff of all builder changes
-  2. Check against C# 14 / .NET 10 standards from docs/csharp-dotnet10-skill.md
+  2. Check against C# 14 / .NET 10 standards from docs/development/csharp-dotnet10-skill.md
   3. Check against every M14 anti-pattern in CLAUDE.md — flag any new instances
   4. Rate each finding: critical / high / medium / low / info
   5. Only block on critical or high findings
@@ -561,7 +561,7 @@ Do:
 
 ## Backlog Integration
 
-- All feature stories are tracked in `docs/backlog.md` under the relevant milestone
+- All feature stories are tracked in `docs/backlog/backlog.md` under the relevant milestone
 - M14 sub-areas: M14.1 (Language), M14.2 (Runtime API), M14.3 (DI/Config),
   M14.4 (CancellationToken), M14.5 (Error Handling), M14.6 (Performance),
   M14.7 (Testing), M14.8 (Security), M14.9 (Architecture), M14.10 (Remediation Report)

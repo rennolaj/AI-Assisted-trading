@@ -45,7 +45,7 @@ See `README.md` main project file under "Smoke test (ngrok)" section.
 - Live trading with Kraken Futures
 
 **Setup Instructions:**
-See `docs/pine-script-production-guide.md` for complete documentation.
+See `docs/integrations/tradingview/pine-script-production-guide.md` for complete documentation.
 
 ---
 
@@ -280,10 +280,10 @@ Check settings:
 
 ## Documentation
 
-- **Production Script Guide**: `docs/pine-script-production-guide.md`
-- **Command Reference**: `docs/command-reference.md`
+- **Production Script Guide**: `docs/integrations/tradingview/pine-script-production-guide.md`
+- **Command Reference**: `docs/development/command-reference.md`
 - **Smoke Testing**: `README.md` (Smoke test section)
-- **Alert Dataflow**: `docs/alert-dataflow-overview.md`
+- **Alert Dataflow**: `docs/architecture/alert-dataflow-overview.md`
 - **Backend Indicators**: `src/Mvp.Trading.Indicators/IndicatorEngine.cs`
 
 ---

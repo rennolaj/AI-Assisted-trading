@@ -63,7 +63,7 @@ All bash scripts used in Dockerfiles have been ported to PowerShell for Windows 
 
 ### Documentation (1 file)
 
-3. **`docs/command-reference.md`**
+3. **`docs/development/command-reference.md`**
    - Added Windows support section
    - PowerShell command examples
    - Cross-platform quick reference
@@ -107,7 +107,7 @@ RUN ./scripts/test.sh || pwsh -File ./scripts/test.ps1
 ```
 ✅ Dockerfile (added PowerShell fallback)
 ✅ Dockerfile.worker (added PowerShell fallback)
-✅ docs/command-reference.md (added Windows section)
+✅ docs/development/command-reference.md (added Windows section)
 ```
 
 ## Usage
@@ -224,13 +224,13 @@ docker images | grep mvp-trading
 
 - **Windows Guide**: [scripts/WINDOWS.md](WINDOWS.md)
 - **Quick Summary**: [scripts/WINDOWS-SUMMARY.md](WINDOWS-SUMMARY.md)
-- **Command Reference**: [docs/command-reference.md](../docs/command-reference.md)
+- **Command Reference**: [docs/development/command-reference.md](../docs/development/command-reference.md)
 - **Main README**: [README.md](../README.md)
 
 ## Git Commit Recommendation
 
 ```bash
-git add scripts/*.ps1 scripts/dev/bootstrap.ps1 scripts/*.md Dockerfile* docs/command-reference.md
+git add scripts/*.ps1 scripts/dev/bootstrap.ps1 scripts/*.md Dockerfile* docs/development/command-reference.md
 git commit -m "Add Windows PowerShell script support for Docker builds
 
 - Created PowerShell versions of all build scripts

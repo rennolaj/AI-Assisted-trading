@@ -16,10 +16,10 @@ projects:
     defaultBranch: main
     tracker:
       plugin: github
-    skillFile: docs/csharp-dotnet10-skill.md
+    skillFile: docs/development/csharp-dotnet10-skill.md
     contractFile: CLAUDE.md
     agentRules: |-
-      Always read CLAUDE.md and docs/csharp-dotnet10-skill.md before writing any code.
+      Always read CLAUDE.md and docs/development/csharp-dotnet10-skill.md before writing any code.
       Never introduce M14 anti-patterns (see CLAUDE.md for full list).
       Always run tests before marking work done: ./scripts/test.sh
       Use conventional commits (feat:, fix:, chore:, docs:, refactor:, test:).

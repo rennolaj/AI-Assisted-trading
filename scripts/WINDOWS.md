@@ -51,7 +51,7 @@ Gets the public webhook URL from a running ngrok container.
 ./scripts/get-ngrok-url.sh
 ```
 
-**See also:** [ngrok Docker Guide](../docs/ngrok-docker-guide.md)
+**See also:** [ngrok Docker Guide](../docs/integrations/ngrok/ngrok-docker-guide.md)
 
 ### Scripts Without PowerShell Versions (Yet)
 
@@ -387,8 +387,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
 
 ## See Also
 
-- [Command Reference](../docs/command-reference.md) - Complete command documentation
-- [Environment Switching](../docs/environment-switching.md) - Managing different environments
+- [Command Reference](../docs/development/command-reference.md) - Complete command documentation
+- [Environment Switching](../docs/configuration/environment-switching.md) - Managing different environments
 - [Docker Documentation](../README.md#docker-setup) - Docker setup and configuration
 
 ## Contributing

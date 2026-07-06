@@ -177,5 +177,5 @@ public sealed record ElliottContext(
 |-------------|----------------|
 | Keep SignalSnapshot as secondary / optional context | Misses the primary value of LLM reasoning; indicator data is the richest signal |
 | Summarise SignalSnapshot before sending (e.g., just "bullish" / "bearish" per timeframe) | Loses nuance (e.g., RSI 49 vs 28 both "neutral" but very different); LLM can handle raw values |
-| Send raw candle OHLCV data instead of computed indicators | Candles are not persisted per-alert (see `docs/alert-dataflow-overview.md`); would require additional storage; computed indicators are already the right abstraction |
+| Send raw candle OHLCV data instead of computed indicators | Candles are not persisted per-alert (see `docs/architecture/alert-dataflow-overview.md`); would require additional storage; computed indicators are already the right abstraction |
 | Add SignalSnapshot to the existing `adjudicateElliott` prompt | The `adjudicateElliott` tool is being replaced by the deterministic gate (ADR-001 + M16); adding context to a deprecated prompt is wasted effort |
