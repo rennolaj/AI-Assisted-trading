@@ -263,6 +263,6 @@ To change refresh rate:
 ---
 
 ## Related Documentation
-- `docs/m7.3-metrics-guide.md` - Complete metrics reference
-- `docs/m7.3-implementation-plan.md` - Implementation details
+- `docs/operations/observability/m7.3-metrics-guide.md` - Complete metrics reference
+- `docs/milestones/m7-hardening-observability/m7.3-implementation-plan.md` - Implementation details
 - `README.md` - Observability section

@@ -49,7 +49,7 @@ PowerShell equivalents of all bash scripts needed for building Docker images on 
    - Updated to support both bash and PowerShell scripts
    - Same fallback mechanism as main Dockerfile
 
-3. **`docs/command-reference.md`**
+3. **`docs/development/command-reference.md`**
    - Added Windows support section
    - Included PowerShell command examples
    - Added reference to WINDOWS.md
@@ -241,7 +241,7 @@ docker compose up -d postgres
 ## Documentation References
 
 - **Main Documentation**: [scripts/WINDOWS.md](../scripts/WINDOWS.md)
-- **Command Reference**: [docs/command-reference.md](../docs/command-reference.md)
+- **Command Reference**: [docs/development/command-reference.md](../docs/development/command-reference.md)
 - **Project README**: [README.md](../README.md)
 
 ## Summary

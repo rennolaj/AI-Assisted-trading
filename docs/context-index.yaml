@@ -1,0 +1,137 @@
+version: 1
+purpose: Curated documentation contexts for agents. Load the smallest matching context for the current task.
+
+contexts:
+  core:
+    purpose: Baseline project orientation.
+    files:
+      - docs/README.md
+      - docs/architecture/architecture.md
+      - docs/architecture/deep-dive-api-interface.md
+      - docs/configuration/configuration.md
+      - docs/backlog/backlog.md
+      - docs/adr/ADR-000-index.md
+    tags: [architecture, api, configuration, backlog, adr]
+
+  builder:
+    purpose: Implementation context for feature-building agents.
+    files:
+      - docs/context/core.md
+      - docs/development/command-reference.md
+      - docs/development/csharp-dotnet10-skill.md
+      - docs/configuration/configuration.md
+    tags: [builder, implementation, dotnet, commands]
+
+  reviewer:
+    purpose: Review context for correctness, regressions, and design compliance.
+    files:
+      - docs/context/core.md
+      - docs/adr/ADR-000-index.md
+      - docs/development/csharp-dotnet10-skill.md
+    tags: [reviewer, code-review, adr, quality]
+
+  tester:
+    purpose: Validation context for feature and regression testing.
+    files:
+      - docs/context/core.md
+      - docs/development/command-reference.md
+      - docs/development/local-development.md
+      - docs/configuration/fixture-mode-switching.md
+      - docs/configuration/fixture-mode-quick-ref.md
+    tags: [tester, validation, fixture-mode, regression]
+
+  integrator:
+    purpose: Integration and dataflow verification context.
+    files:
+      - docs/context/core.md
+      - docs/architecture/alert-dataflow-overview.md
+      - docs/architecture/deep-dive-api-interface.md
+      - docs/context/trading-pipeline.md
+      - docs/operations/deployment/production-deployment-guide.md
+    tags: [integrator, dataflow, deployment, integration]
+
+  trading-pipeline:
+    purpose: Alert ingestion through analysis, adjudication, risk, and trade planning.
+    files:
+      - docs/architecture/alert-dataflow-overview.md
+      - docs/architecture/deep-dive-api-interface.md
+      - docs/integrations/tradingview/pine-script-production-guide.md
+      - docs/milestones/m4-elliott/m4-elliott-low-level.md
+      - docs/milestones/m6-risk-execution/m6-overview.md
+      - docs/milestones/m9-backtesting-fixtures/m9-dataflow-validation-plan.md
+    tags: [trading, dataflow, alerts, elliott, risk]
+
+  kraken:
+    purpose: Kraken Futures API behavior, configuration, and connector requirements.
+    files:
+      - docs/integrations/kraken/kraken-futures-api-findings.md
+      - docs/integrations/kraken/kraken-futures-configuration-guide.md
+      - docs/integrations/kraken/kraken-futures-low-level.md
+    tags: [kraken, exchange, futures, connector]
+
+  llm-ai:
+    purpose: LLM architecture, advisory boundaries, persistence, and provider options.
+    files:
+      - docs/llm-ai/local-llm-options.md
+      - docs/milestones/m9-backtesting-fixtures/m9-llm-fixtures-findings.md
+      - docs/milestones/m9-backtesting-fixtures/m9-llm-persistence-design.md
+      - docs/adr/ADR-001-deterministic-gate-llm-advisory-separation.md
+      - docs/adr/ADR-002-signal-snapshot-as-primary-llm-context.md
+      - docs/adr/ADR-003-microsoft-extensions-ai-adoption.md
+      - docs/adr/ADR-004-llm-confluence-advisor.md
+      - docs/adr/ADR-005-llm-stop-loss-advisor.md
+      - docs/adr/ADR-006-post-trade-llm-review-loop.md
+      - docs/adr/ADR-007-market-regime-classifier.md
+      - docs/adr/ADR-008-structured-output-adoption.md
+    tags: [llm, ai, prompts, structured-output, advisory]
+
+  testing-validation:
+    purpose: E2E tests, fixture mode, historical backtesting, and validation results.
+    files:
+      - docs/milestones/m6-risk-execution/m6-e2e-validation-plan.md
+      - docs/milestones/m6-risk-execution/m6-e2e-test-results.md
+      - docs/milestones/m6-risk-execution/m6.6-order-placement-tests.md
+      - docs/milestones/m9-backtesting-fixtures/m9-elliott-visual-tests.md
+      - docs/milestones/m9-backtesting-fixtures/m9.2-historical-fixture-test-plan.md
+      - docs/milestones/m9-backtesting-fixtures/m9.2-test-matrix-20260108-11.csv
+      - docs/milestones/m9-backtesting-fixtures/m9-fixture-backtest-1767375300-analysis.md
+      - docs/milestones/m9-backtesting-fixtures/m9-scenario-framework.md
+    tags: [testing, validation, e2e, fixtures, backtesting]
+
+  operations:
+    purpose: Production and operational runbooks.
+    files:
+      - docs/operations/deployment/production-deployment-guide.md
+      - docs/operations/reconciliation/m7.1-reconciliation-operations.md
+      - docs/operations/kill-switch/m7.2-kill-switch-operations.md
+      - docs/operations/observability/grafana-quick-start.md
+      - docs/operations/observability/grafana-status.md
+      - docs/operations/observability/m7.3-metrics-guide.md
+    tags: [operations, deployment, observability, reconciliation, kill-switch]
+
+  security:
+    purpose: Azure security posture, secrets, network, database, AI security, backup, and git hygiene.
+    files:
+      - docs/milestones/m18-security/m18-technical-requirements.md
+      - docs/adr/ADR-009-managed-identity-keyless-auth.md
+      - docs/adr/ADR-010-azure-key-vault-secrets-management.md
+      - docs/adr/ADR-011-network-security-vnet-private-endpoints.md
+      - docs/adr/ADR-012-database-security-least-privilege.md
+      - docs/adr/ADR-013-defender-for-cloud-monitoring.md
+      - docs/adr/ADR-014-devops-security-pipeline.md
+      - docs/adr/ADR-015-container-security-hardening.md
+      - docs/adr/ADR-016-ai-security-posture.md
+      - docs/adr/ADR-017-backup-and-recovery.md
+      - docs/adr/ADR-018-git-history-secret-removal.md
+    tags: [security, azure, secrets, network, database, ai-security]
+
+  milestones:
+    purpose: Milestone-level requirements, plans, and status.
+    files:
+      - docs/milestones/m4-elliott/m4-elliott-low-level.md
+      - docs/milestones/m5/m5-status.md
+      - docs/milestones/m6-risk-execution/
+      - docs/milestones/m7-hardening-observability/
+      - docs/milestones/m9-backtesting-fixtures/
+      - docs/milestones/m18-security/m18-technical-requirements.md
+    tags: [milestones, planning, requirements, status]

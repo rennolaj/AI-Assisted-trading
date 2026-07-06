@@ -33,7 +33,7 @@ ASP.NET Core 10 API          idempotency check · payload normalization · 3s AC
                                                          Reconciliation Worker  60s
 ```
 
-See [Architecture Reference](docs/architecture.md) for the full component map, persistence model, and design decisions.
+See [Architecture Reference](docs/architecture/architecture.md) for the full component map, persistence model, and design decisions.
 
 ---
 
@@ -71,7 +71,7 @@ docker compose up --build
 
 > `build.sh` installs and starts PostgreSQL + Redis locally by default. Set `DEV_BOOTSTRAP=0` to skip if you manage these services yourself.
 
-See [Local Development](docs/local-development.md) for Docker, TradingView webhook testing (ngrok), smoke tests, and fixture capture.
+See [Local Development](docs/development/local-development.md) for Docker, TradingView webhook testing (ngrok), smoke tests, and fixture capture.
 
 ---
 
@@ -79,23 +79,23 @@ See [Local Development](docs/local-development.md) for Docker, TradingView webho
 
 | Topic | |
 |-------|-|
-| [Architecture overview](docs/architecture.md) | Component map, data flow, persistence model, design decisions |
-| [Local development](docs/local-development.md) | Build, Docker, ngrok, smoke test, fixture capture |
-| [Configuration reference](docs/configuration.md) | All runtime config keys by section |
-| [Environment files](docs/environment-files.md) | `.env.*` file guide — what goes where |
-| [Production deployment](docs/production-deployment-guide.md) | Docker build, DB init, health checks, LLM setup |
-| [Kill switch operations](docs/m7.2-kill-switch-operations.md) | Emergency stop procedures and API reference |
-| [Metrics and observability](docs/m7.3-metrics-guide.md) | Prometheus metrics catalog and Grafana query examples |
-| [ngrok webhook setup](docs/ngrok-quickstart.md) | TradingView webhook tunnel configuration |
+| [Architecture overview](docs/architecture/architecture.md) | Component map, data flow, persistence model, design decisions |
+| [Local development](docs/development/local-development.md) | Build, Docker, ngrok, smoke test, fixture capture |
+| [Configuration reference](docs/configuration/configuration.md) | All runtime config keys by section |
+| [Environment files](docs/configuration/environment-files.md) | `.env.*` file guide — what goes where |
+| [Production deployment](docs/operations/deployment/production-deployment-guide.md) | Docker build, DB init, health checks, LLM setup |
+| [Kill switch operations](docs/operations/kill-switch/m7.2-kill-switch-operations.md) | Emergency stop procedures and API reference |
+| [Metrics and observability](docs/operations/observability/m7.3-metrics-guide.md) | Prometheus metrics catalog and Grafana query examples |
+| [ngrok webhook setup](docs/integrations/ngrok/ngrok-quickstart.md) | TradingView webhook tunnel configuration |
 | [Architecture Decision Records](docs/adr/ADR-000-index.md) | ADR-001–ADR-018: LLM architecture, Azure security, git hygiene |
-| [**Backlog / Roadmap**](docs/backlog.md) | All milestones M0–M19: status, stories, effort estimates |
-| [Development agent pipeline](docs/dev-agents.md) | Multi-agent feature workflow (Claude / Codex) |
+| [**Backlog / Roadmap**](docs/backlog/backlog.md) | All milestones M0–M19: status, stories, effort estimates |
+| [Development agent pipeline](docs/development/dev-agents.md) | Multi-agent feature workflow (Claude / Codex) |
 
 ---
 
 ## Roadmap and Known Limitations
 
-Full backlog with story-level detail: [docs/backlog.md](docs/backlog.md).
+Full backlog with story-level detail: [docs/backlog/backlog.md](docs/backlog/backlog.md).
 
 Pending items of note:
 
@@ -135,7 +135,7 @@ curl http://localhost:8080/api/killswitch/status
 
 Levels: `PAUSE_NEW` (new alerts only) · `PAUSE_ALL` (all workers) · `EMERGENCY_STOP` (cancel orders + pause).
 State persists in `system_state`; all activations audited in `kill_switch_audit`.
-See [Kill Switch Operations](docs/m7.2-kill-switch-operations.md).
+See [Kill Switch Operations](docs/operations/kill-switch/m7.2-kill-switch-operations.md).
 
 ---
 
@@ -150,7 +150,7 @@ curl http://localhost:9464/metrics              # Prometheus (Worker)
 
 Prometheus UI: http://localhost:9090 · Grafana: http://localhost:3000
 
-See [Metrics Guide](docs/m7.3-metrics-guide.md).
+See [Metrics Guide](docs/operations/observability/m7.3-metrics-guide.md).
 
 ---
 
@@ -166,4 +166,4 @@ Features go through a 7-stage multi-agent review pipeline: planner → rubber-du
 ./scripts/agents/run-feature-once-claude.sh --scope <feature-id>
 ```
 
-See [Development Agent Pipeline](docs/dev-agents.md) for full setup, stage order, and troubleshooting.
+See [Development Agent Pipeline](docs/development/dev-agents.md) for full setup, stage order, and troubleshooting.
