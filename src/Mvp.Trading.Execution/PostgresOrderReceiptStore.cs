@@ -31,7 +31,8 @@ insert into order_receipt (
 )
 values (@receipt_id, @execution_id, @order_kind, @client_order_id, @exchange_order_id, @status, @qty, @price, @created_at_utc);";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("receipt_id", Guid.NewGuid());
         cmd.Parameters.AddWithValue("execution_id", executionId);
         cmd.Parameters.AddWithValue("order_kind", orderKind);

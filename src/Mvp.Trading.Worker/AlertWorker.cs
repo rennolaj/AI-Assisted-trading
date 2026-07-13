@@ -330,12 +330,17 @@ public sealed class AlertWorker : BackgroundService
 
     private async Task<RedisValue> DequeueAsync(CancellationToken ct)
     {
+        // StackExchange.Redis async operations do not accept a CancellationToken;
+        // honor cancellation around them. Only the read-only length query is
+        // WaitAsync(ct)-wrapped — abandoning an in-flight pop could drop an alert.
+        ct.ThrowIfCancellationRequested();
         var db = _redis.GetDatabase();
-        
+
         // Update queue depth gauge
-        var queueLength = await db.ListLengthAsync(_options.AlertQueueKey).ConfigureAwait(false);
+        var queueLength = await db.ListLengthAsync(_options.AlertQueueKey).WaitAsync(ct).ConfigureAwait(false);
         _metricsService.SetQueueDepthGauge((int)queueLength);
-        
+
+        ct.ThrowIfCancellationRequested();
         return await db.ListLeftPopAsync(_options.AlertQueueKey).ConfigureAwait(false);
     }
 

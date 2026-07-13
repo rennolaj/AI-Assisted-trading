@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Mvp.Trading.Api;
 using Mvp.Trading.Api.Mcp;
 using Mvp.Trading.Api.Models;
+using Mvp.Trading.Api.Security;
 using Mvp.Trading.Api.Services;
 using Mvp.Trading.Contracts;
 using Mvp.Trading.Contracts.Telemetry;
@@ -138,7 +139,7 @@ app.MapPost("/webhooks/tradingview/{secret}", async (
     {
         var logger = loggerFactory.CreateLogger("WebhookIngress");
         var expectedSecret = options.Value.WebhookSecret;
-        if (string.IsNullOrWhiteSpace(expectedSecret) || !string.Equals(secret, expectedSecret, StringComparison.Ordinal))
+        if (!SecretComparer.FixedTimeEquals(secret, expectedSecret))
         {
             return Results.Unauthorized();
         }
@@ -204,7 +205,7 @@ app.MapPost("/webhooks/tradingview/{secret}", async (
             return Results.BadRequest(new { error = "IdempotencyKey is required." });
         }
 
-        if (!idempotency.TryAdd(payload.IdempotencyKey))
+        if (!await idempotency.TryAddAsync(payload.IdempotencyKey, ct))
         {
             logger.LogInformation("Duplicate alert ignored for idempotency key {IdempotencyKey}.", payload.IdempotencyKey);
             return Results.Ok(new { status = "duplicate_ignored" });

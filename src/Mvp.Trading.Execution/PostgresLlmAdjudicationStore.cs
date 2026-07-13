@@ -42,7 +42,8 @@ public sealed class PostgresLlmAdjudicationStore : ILlmAdjudicationStore
                 @parse_error, @validation_errors::jsonb
             )";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("adjudication_id", adjudication.AdjudicationId);
         cmd.Parameters.AddWithValue("alert_id", adjudication.AlertId);
         cmd.Parameters.AddWithValue("correlation_id", adjudication.CorrelationId);

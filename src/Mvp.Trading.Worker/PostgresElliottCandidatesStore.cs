@@ -58,7 +58,8 @@ on conflict (alert_id) do update set
         var parametersJson = JsonSerializer.Serialize(parameters, ElliottCandidatesJson.Options);
         var candidatesJson = ElliottCandidatesJson.Serialize(candidates);
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("alert_id", alertId);
         cmd.Parameters.AddWithValue("computed_at_utc", computedAtUtc.UtcDateTime);
         cmd.Parameters.AddWithValue("evaluation_time_utc", evaluationTimeUtc.UtcDateTime);

@@ -12,19 +12,22 @@ public sealed class KillSwitchService : IKillSwitchService
     private readonly IMemoryCache _cache;
     private readonly ITradingProvider _tradingProvider;
     private readonly ILogger<KillSwitchService> _logger;
-    private const string CacheKey = "kill_switch_status";
+    private readonly TimeProvider _time;
+    internal const string CacheKey = "kill_switch_status";
     private static readonly TimeSpan CacheDuration = TimeSpan.FromSeconds(5);
 
     public KillSwitchService(
         string connectionString,
         IMemoryCache cache,
         ITradingProvider tradingProvider,
-        ILogger<KillSwitchService> logger)
+        ILogger<KillSwitchService> logger,
+        TimeProvider? timeProvider = null)
     {
         _connectionString = connectionString;
         _cache = cache;
         _tradingProvider = tradingProvider;
         _logger = logger;
+        _time = timeProvider ?? TimeProvider.System;
     }
 
     public async Task<bool> IsActiveAsync(CancellationToken ct = default)
@@ -47,37 +50,58 @@ public sealed class KillSwitchService : IKillSwitchService
             return cached!;
         }
 
-        // Query database
-        await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync(ct);
-
-        const string sql = "select value from system_state where key = 'kill_switch'";
-        await using var cmd = new NpgsqlCommand(sql, conn);
-        var jsonValue = await cmd.ExecuteScalarAsync(ct);
-
-        if (jsonValue == null)
+        // Query database — any failure to obtain a definitive state fails CLOSED:
+        // an active EMERGENCY_STOP status is returned so trading halts.
+        try
         {
-            _logger.LogWarning("Kill switch state not found in database, assuming inactive");
-            return new KillSwitchStatus(false, KillSwitchLevel.PAUSE_ALL, null, null);
+            await using var conn = new NpgsqlConnection(_connectionString);
+            await conn.OpenAsync(ct);
+
+            const string sql = "select value from system_state where key = 'kill_switch'";
+            await using var cmd = new NpgsqlCommand(sql, conn);
+            var jsonValue = await cmd.ExecuteScalarAsync(ct);
+
+            if (jsonValue == null)
+            {
+                _logger.LogError("Kill switch state row missing in database — failing closed with EMERGENCY_STOP");
+                return CreateFailClosedStatus("Kill switch state row missing in database");
+            }
+
+            var json = jsonValue.ToString()!;
+            var doc = JsonDocument.Parse(json);
+            var active = doc.RootElement.GetProperty("active").GetBoolean();
+            var level = Enum.Parse<KillSwitchLevel>(doc.RootElement.GetProperty("level").GetString()!);
+            var reason = doc.RootElement.TryGetProperty("reason", out var r) && r.ValueKind != JsonValueKind.Null
+                ? r.GetString()
+                : null;
+            var activatedAt = doc.RootElement.TryGetProperty("activated_at", out var a) && a.ValueKind != JsonValueKind.Null
+                ? a.GetDateTime()
+                : (DateTime?)null;
+
+            var status = new KillSwitchStatus(active, level, reason, activatedAt);
+
+            // Cache for 5 seconds
+            _cache.Set(CacheKey, status, CacheDuration);
+
+            return status;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Caller-initiated cancellation must propagate; Npgsql-internal
+            // timeouts/cancellations fall through to the fail-closed catch below.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Kill switch state unavailable — failing closed with EMERGENCY_STOP");
+            return CreateFailClosedStatus("Kill switch state unavailable (database failure)");
+        }
+    }
 
-        var json = jsonValue.ToString()!;
-        var doc = JsonDocument.Parse(json);
-        var active = doc.RootElement.GetProperty("active").GetBoolean();
-        var level = Enum.Parse<KillSwitchLevel>(doc.RootElement.GetProperty("level").GetString()!);
-        var reason = doc.RootElement.TryGetProperty("reason", out var r) && r.ValueKind != JsonValueKind.Null 
-            ? r.GetString() 
-            : null;
-        var activatedAt = doc.RootElement.TryGetProperty("activated_at", out var a) && a.ValueKind != JsonValueKind.Null
-            ? a.GetDateTime()
-            : (DateTime?)null;
-
-        var status = new KillSwitchStatus(active, level, reason, activatedAt);
-
-        // Cache for 5 seconds
-        _cache.Set(CacheKey, status, CacheDuration);
-
-        return status;
+    private KillSwitchStatus CreateFailClosedStatus(string reason)
+    {
+        // Never cached — every subsequent call retries the database so recovery is immediate.
+        return new KillSwitchStatus(true, KillSwitchLevel.EMERGENCY_STOP, reason, _time.GetUtcNow().UtcDateTime);
     }
 
     public async Task ActivateAsync(KillSwitchLevel level, string reason, string activatedBy, CancellationToken ct = default)

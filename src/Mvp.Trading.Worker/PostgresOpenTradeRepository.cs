@@ -26,7 +26,8 @@ from open_trades
 where status = 'open' and exchange_id = @exchange_id;";
 
         var results = new List<OpenTrade>();
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("exchange_id", exchangeId);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
@@ -52,7 +53,8 @@ set last_checked_utc = @checked_utc,
     last_price = @last_price
 where trade_id = @trade_id;";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("checked_utc", DateTimeOffset.UtcNow.UtcDateTime);
         cmd.Parameters.AddWithValue("last_price", lastPrice);
         cmd.Parameters.AddWithValue("trade_id", tradeId);
@@ -71,7 +73,8 @@ set status = 'invalidated',
     invalidation_reason = @reason
 where trade_id = @trade_id;";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("invalidated_utc", DateTimeOffset.UtcNow.UtcDateTime);
         cmd.Parameters.AddWithValue("last_price", lastPrice);
         cmd.Parameters.AddWithValue("reason", reason);

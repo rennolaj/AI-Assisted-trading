@@ -13,4 +13,8 @@
     <ProjectReference Include="..\Mvp.Trading.Contracts\Mvp.Trading.Contracts.csproj" />
     <ProjectReference Include="..\Mvp.Trading.Risk\Mvp.Trading.Risk.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Mvp.Trading.Execution.Tests" />
+  </ItemGroup>
 </Project>

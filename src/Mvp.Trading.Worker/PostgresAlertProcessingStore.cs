@@ -31,7 +31,8 @@ on conflict (alert_id) do update set
     last_updated_utc = excluded.last_updated_utc,
     error_message = excluded.error_message;";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("alert_id", alert.AlertId);
         cmd.Parameters.AddWithValue("idempotency_key", alert.IdempotencyKey);
         cmd.Parameters.AddWithValue("status", status);

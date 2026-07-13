@@ -17,7 +17,8 @@ public sealed class PostgresElliottCandidatesQuery : IElliottCandidatesQuery
     public async Task<string?> GetJsonByAlertIdAsync(Guid alertId, CancellationToken ct)
     {
         const string sql = "select candidates_json from elliott_candidates where alert_id = @alert_id;";
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("alert_id", alertId);
 
         var result = await cmd.ExecuteScalarAsync(ct);

@@ -109,7 +109,8 @@ set resolved = true,
     resolution_notes = @resolution_notes
 where discrepancy_id = @discrepancy_id";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("discrepancy_id", discrepancyId);
         cmd.Parameters.AddWithValue("resolved_at_utc", DateTimeOffset.UtcNow.UtcDateTime);
         cmd.Parameters.AddWithValue("resolution_notes", resolutionNotes);

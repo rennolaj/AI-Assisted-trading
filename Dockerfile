@@ -31,4 +31,8 @@ EXPOSE 8080
 
 COPY --from=build /app/publish ./
 
+# Run as the non-root user shipped with the .NET base images.
+# App files stay root-owned and read-only for the runtime user.
+USER app
+
 ENTRYPOINT ["dotnet", "Mvp.Trading.Api.dll"]

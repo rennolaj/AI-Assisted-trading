@@ -27,30 +27,30 @@ public sealed class McpGatewayRouter : IMcpGateway
 
     public Task<Result<McpAdjudicationResult>> AdjudicateElliottAsync(ElliottAdjudicationInput input, CancellationToken ct)
     {
-        return ExecuteAsync(gateway => gateway.AdjudicateElliottAsync(input, ct), ct);
+        return ExecuteAsync((gateway, token) => gateway.AdjudicateElliottAsync(input, token), ct);
     }
 
     public Task<Result<StopLossSuggestion>> ExplainStopLossAsync(StopLossExplainInput input, CancellationToken ct)
     {
-        return ExecuteAsync(gateway => gateway.ExplainStopLossAsync(input, ct), ct);
+        return ExecuteAsync((gateway, token) => gateway.ExplainStopLossAsync(input, token), ct);
     }
 
-    private async Task<Result<T>> ExecuteAsync<T>(Func<IMcpGateway, Task<Result<T>>> action, CancellationToken ct)
+    private async Task<Result<T>> ExecuteAsync<T>(Func<IMcpGateway, CancellationToken, Task<Result<T>>> action, CancellationToken ct)
     {
         var provider = NormalizeProvider(_options.Provider);
         _logger.LogInformation("MCP provider set to {Provider} (fallbackOnOpenAi429={Fallback}).", provider, _options.FallbackOnOpenAi429);
         return provider switch
         {
-            "local" => await action(_localGateway),
-            "openai" => await action(_openAiGateway),
+            "local" => await action(_localGateway, ct),
+            "openai" => await action(_openAiGateway, ct),
             "auto" => await ExecuteWithFallbackAsync(action, ct),
-            _ => await ExecuteWithDefaultAsync(action, provider)
+            _ => await ExecuteWithDefaultAsync(action, provider, ct)
         };
     }
 
-    private async Task<Result<T>> ExecuteWithFallbackAsync<T>(Func<IMcpGateway, Task<Result<T>>> action, CancellationToken ct)
+    private async Task<Result<T>> ExecuteWithFallbackAsync<T>(Func<IMcpGateway, CancellationToken, Task<Result<T>>> action, CancellationToken ct)
     {
-        var primary = await action(_openAiGateway);
+        var primary = await action(_openAiGateway, ct);
         if (primary.Ok || primary.Error is null)
         {
             return primary;
@@ -62,7 +62,7 @@ public sealed class McpGatewayRouter : IMcpGateway
         }
 
         _logger.LogWarning("OpenAI returned {Code}; falling back to local LLM.", primary.Error.Code);
-        var fallback = await action(_localGateway);
+        var fallback = await action(_localGateway, ct);
         if (fallback.Ok)
         {
             return fallback;
@@ -76,10 +76,10 @@ public sealed class McpGatewayRouter : IMcpGateway
         return primary;
     }
 
-    private async Task<Result<T>> ExecuteWithDefaultAsync<T>(Func<IMcpGateway, Task<Result<T>>> action, string provider)
+    private async Task<Result<T>> ExecuteWithDefaultAsync<T>(Func<IMcpGateway, CancellationToken, Task<Result<T>>> action, string provider, CancellationToken ct)
     {
         _logger.LogWarning("Unknown MCP provider '{Provider}', defaulting to OpenAI.", provider);
-        return await action(_openAiGateway);
+        return await action(_openAiGateway, ct);
     }
 
     private bool ShouldFallback(Error error)

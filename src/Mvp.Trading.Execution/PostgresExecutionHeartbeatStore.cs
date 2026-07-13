@@ -19,8 +19,10 @@ public sealed class PostgresExecutionHeartbeatStore : IExecutionHeartbeatStore
         var now = DateTimeOffset.UtcNow;
         DateTimeOffset? lastBeat = null;
 
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+
         const string selectSql = "select last_beat_utc from execution_heartbeat where service_name = @service_name;";
-        await using (var selectCmd = _dataSource.CreateCommand(selectSql))
+        await using (var selectCmd = new NpgsqlCommand(selectSql, conn))
         {
             selectCmd.Parameters.AddWithValue("service_name", serviceName);
             await using var reader = await selectCmd.ExecuteReaderAsync(ct);
@@ -41,7 +43,7 @@ on conflict (service_name) do update set
     last_beat_utc = excluded.last_beat_utc,
     stale_threshold_seconds = excluded.stale_threshold_seconds;";
 
-        await using var cmd = _dataSource.CreateCommand(upsertSql);
+        await using var cmd = new NpgsqlCommand(upsertSql, conn);
         cmd.Parameters.AddWithValue("service_name", serviceName);
         cmd.Parameters.AddWithValue("last_beat_utc", now.UtcDateTime);
         cmd.Parameters.AddWithValue("stale_threshold_seconds", staleThresholdSeconds);

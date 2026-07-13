@@ -5,5 +5,5 @@ namespace Mvp.Trading.Api.Services;
 /// </summary>
 public interface IIdempotencyStore
 {
-    bool TryAdd(string key);
+    Task<bool> TryAddAsync(string key, CancellationToken ct);
 }

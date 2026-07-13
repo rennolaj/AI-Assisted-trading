@@ -21,9 +21,11 @@ public sealed class KillSwitchServiceTests
     // 4. Remove [Fact(Skip = "Requires database")] to enable tests
 
     [Fact(Skip = "Requires database")]
-    public async Task GetStatusAsync_InitialState_ReturnsInactive()
+    public async Task GetStatusAsync_SeededInactiveRow_ReturnsInactive()
     {
-        // This test verifies that a fresh kill switch starts in inactive state
+        // Requires the kill_switch row seeded by scripts/db/init.sql
+        // (active=false, PAUSE_ALL). Without that row the service fails
+        // CLOSED — see GetStatusAsync_MissingStateRow_ReturnsFailClosed.
         var sut = CreateService();
         var status = await sut.GetStatusAsync();
 
@@ -44,6 +46,81 @@ public sealed class KillSwitchServiceTests
 
         Assert.True(fakeTradingProvider.GetOpenOrdersCalled);
         Assert.Equal(2, fakeTradingProvider.CancelledOrders.Count);
+    }
+
+    [Fact(Skip = "Requires database")]
+    public async Task GetStatusAsync_MissingStateRow_ReturnsFailClosed()
+    {
+        // Fail-closed behavior: a reachable database WITHOUT a seeded kill_switch
+        // row must return an active EMERGENCY_STOP status (never fail-open).
+        var sut = CreateService();
+        var status = await sut.GetStatusAsync();
+
+        Assert.True(status.Active);
+        Assert.Equal(KillSwitchLevel.EMERGENCY_STOP, status.Level);
+        Assert.NotNull(status.Reason);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_DatabaseUnreachable_ReturnsFailClosedEmergencyStop()
+    {
+        var sut = CreateService(connectionString: UnreachableConnectionString);
+
+        var status = await sut.GetStatusAsync();
+
+        Assert.True(status.Active);
+        Assert.Equal(KillSwitchLevel.EMERGENCY_STOP, status.Level);
+        Assert.NotNull(status.Reason);
+        Assert.NotNull(status.ActivatedAt);
+    }
+
+    [Fact]
+    public async Task IsActiveAsync_DatabaseUnreachable_ReturnsTrue()
+    {
+        var sut = CreateService(connectionString: UnreachableConnectionString);
+
+        var active = await sut.IsActiveAsync();
+
+        Assert.True(active);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_FailClosedStatus_IsNotCached()
+    {
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var sut = CreateService(connectionString: UnreachableConnectionString, cache: cache);
+
+        var status = await sut.GetStatusAsync();
+
+        Assert.True(status.Active);
+        Assert.False(cache.TryGetValue(CacheKey, out _));
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_CachedStatus_ReturnedWithoutDatabase()
+    {
+        var cache = new MemoryCache(new MemoryCacheOptions());
+        var cached = new KillSwitchStatus(false, KillSwitchLevel.PAUSE_ALL, null, null);
+        cache.Set(CacheKey, cached, TimeSpan.FromSeconds(5));
+        var sut = CreateService(connectionString: UnreachableConnectionString, cache: cache);
+
+        var status = await sut.GetStatusAsync();
+
+        Assert.Same(cached, status);
+        Assert.False(status.Active);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_CancelledToken_ThrowsOperationCanceled()
+    {
+        var sut = CreateService(connectionString: UnreachableConnectionString);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Caller-initiated cancellation must propagate, never be converted
+        // into a fail-closed status.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => sut.GetStatusAsync(cts.Token));
     }
 
     // Behavioral test that doesn't require database - tests emergency order cancellation
@@ -67,10 +144,19 @@ public sealed class KillSwitchServiceTests
         Assert.Contains("order-2", provider.CancelledOrders);
     }
 
-    private static KillSwitchService CreateService(ITradingProvider? tradingProvider = null)
+    private const string CacheKey = KillSwitchService.CacheKey;
+
+    // Port 1 refuses connections immediately; Timeout=1 bounds the worst case.
+    private const string UnreachableConnectionString =
+        "Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=1";
+
+    private static KillSwitchService CreateService(
+        ITradingProvider? tradingProvider = null,
+        string? connectionString = null,
+        IMemoryCache? cache = null)
     {
-        var connectionString = "Host=localhost;Port=5432;Database=ai-trading-db-test;Username=postgres;Password=postgres";
-        var cache = new MemoryCache(new MemoryCacheOptions());
+        connectionString ??= "Host=localhost;Port=5432;Database=ai-trading-db-test;Username=postgres;Password=postgres";
+        cache ??= new MemoryCache(new MemoryCacheOptions());
         var provider = tradingProvider ?? new FakeTradingProvider();
         var logger = NullLogger<KillSwitchService>.Instance;
 

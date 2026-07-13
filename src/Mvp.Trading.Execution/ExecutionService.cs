@@ -180,7 +180,7 @@ public sealed class ExecutionService : IExecutionService
             entryClientOrderId);
 
         var entryResult = await SendWithRetriesAsync(
-            () => _tradingProvider.SendOrderAsync(entryRequest, ct),
+            token => _tradingProvider.SendOrderAsync(entryRequest, token),
             settings.MaxOrderRetries,
             ct);
 
@@ -221,7 +221,7 @@ public sealed class ExecutionService : IExecutionService
             stopClientOrderId);
 
         var stopResult = await SendWithRetriesAsync(
-            () => _tradingProvider.SendOrderAsync(stopRequest, ct),
+            token => _tradingProvider.SendOrderAsync(stopRequest, token),
             settings.MaxOrderRetries,
             ct);
 
@@ -327,7 +327,7 @@ public sealed class ExecutionService : IExecutionService
                 clientOrderId);
 
             var tpResult = await SendWithRetriesAsync(
-                () => _tradingProvider.SendOrderAsync(tpRequest, ct),
+                token => _tradingProvider.SendOrderAsync(tpRequest, token),
                 settings.MaxOrderRetries,
                 ct);
 
@@ -354,7 +354,7 @@ public sealed class ExecutionService : IExecutionService
     }
 
     private async Task<Result<OrderAck>> SendWithRetriesAsync(
-        Func<Task<Result<OrderAck>>> action,
+        Func<CancellationToken, Task<Result<OrderAck>>> action,
         int maxRetries,
         CancellationToken ct)
     {
@@ -363,7 +363,7 @@ public sealed class ExecutionService : IExecutionService
 
         while (true)
         {
-            var result = await action();
+            var result = await action(ct);
             if (result.Ok || attempts >= retries)
             {
                 return result;

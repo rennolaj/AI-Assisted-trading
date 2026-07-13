@@ -26,6 +26,11 @@ public sealed class RedisAlertQueue : IAlertQueue
 
     public async Task EnqueueAsync(AlertEvent alert, CancellationToken ct)
     {
+        // StackExchange.Redis async operations do not accept a CancellationToken;
+        // honor cancellation before the push. The push itself is deliberately not
+        // WaitAsync(ct)-wrapped: abandoning an in-flight destructive write would
+        // leave it ambiguous whether the alert was enqueued.
+        ct.ThrowIfCancellationRequested();
         var db = _redis.GetDatabase();
         var payload = JsonSerializer.Serialize(alert, _jsonOptions);
         await db.ListRightPushAsync(_options.AlertQueueKey, payload).ConfigureAwait(false);

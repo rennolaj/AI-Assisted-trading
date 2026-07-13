@@ -22,7 +22,8 @@ from alert_processing
 where idempotency_key = @idempotency_key
 limit 1;";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("idempotency_key", idempotencyKey);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);

@@ -14,17 +14,18 @@ public sealed class PostgresIdempotencyStore : IIdempotencyStore
         _dataSource = dataSource;
     }
 
-    public bool TryAdd(string key)
+    public async Task<bool> TryAddAsync(string key, CancellationToken ct)
     {
         const string sql = @"
 insert into idempotency_keys (idempotency_key, first_seen_utc)
 values (@idempotency_key, @first_seen_utc)
 on conflict (idempotency_key) do nothing;";
 
-        using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("idempotency_key", key);
         cmd.Parameters.AddWithValue("first_seen_utc", DateTimeOffset.UtcNow.UtcDateTime);
 
-        return cmd.ExecuteNonQuery() == 1;
+        return await cmd.ExecuteNonQueryAsync(ct) == 1;
     }
 }

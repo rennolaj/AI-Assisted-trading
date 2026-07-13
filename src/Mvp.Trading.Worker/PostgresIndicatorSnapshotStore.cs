@@ -52,7 +52,8 @@ on conflict (alert_id) do update set
 
         var json = IndicatorSnapshotJson.Serialize(snapshot);
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("alert_id", snapshot.AlertId);
         cmd.Parameters.AddWithValue("correlation_id", snapshot.CorrelationId);
         cmd.Parameters.AddWithValue("computed_at_utc", snapshot.ComputedAtUtc.UtcDateTime);

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Mvp.Trading.Api.Models;
+using Mvp.Trading.Api.Security;
 using Mvp.Trading.Execution;
 
 namespace Mvp.Trading.Api.Controllers;
@@ -34,7 +35,7 @@ public sealed class KillSwitchController : ControllerBase
     public async Task<IActionResult> Activate([FromBody] KillSwitchActivationRequest request, CancellationToken ct)
     {
         // Validate secret
-        if (string.IsNullOrEmpty(request.Secret) || request.Secret != _options.Secret)
+        if (!SecretComparer.FixedTimeEquals(request.Secret, _options.Secret))
         {
             _logger.LogWarning("Invalid kill switch secret provided from {IP}", HttpContext.Connection.RemoteIpAddress);
             return Unauthorized(new { error = "Invalid secret" });
@@ -54,7 +55,7 @@ public sealed class KillSwitchController : ControllerBase
     public async Task<IActionResult> Deactivate([FromBody] KillSwitchDeactivationRequest request, CancellationToken ct)
     {
         // Validate secret
-        if (string.IsNullOrEmpty(request.Secret) || request.Secret != _options.Secret)
+        if (!SecretComparer.FixedTimeEquals(request.Secret, _options.Secret))
         {
             _logger.LogWarning("Invalid kill switch secret provided from {IP}", HttpContext.Connection.RemoteIpAddress);
             return Unauthorized(new { error = "Invalid secret" });

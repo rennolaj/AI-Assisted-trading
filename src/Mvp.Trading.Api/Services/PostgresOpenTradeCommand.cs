@@ -34,7 +34,8 @@ insert into open_trades (
 values (@trade_id, @exchange_id, @symbol, @side, @entry_price, @invalidation_price, 'open', @opened_at_utc);";
 
         var tradeId = Guid.NewGuid();
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("trade_id", tradeId);
         cmd.Parameters.AddWithValue("exchange_id", request.ExchangeId);
         cmd.Parameters.AddWithValue("symbol", request.Symbol);

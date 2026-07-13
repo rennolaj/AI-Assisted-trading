@@ -36,7 +36,8 @@ insert into alerts (
 values (@alert_id, @idempotency_key, @received_at_utc, @source, @raw_payload, @alert_json)
 on conflict (idempotency_key) do nothing;";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("alert_id", alert.AlertId);
         cmd.Parameters.AddWithValue("idempotency_key", alert.IdempotencyKey);
         cmd.Parameters.AddWithValue("received_at_utc", alert.ReceivedAtUtc.UtcDateTime);

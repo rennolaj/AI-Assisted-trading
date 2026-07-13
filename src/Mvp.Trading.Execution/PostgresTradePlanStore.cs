@@ -37,7 +37,8 @@ on conflict (plan_id) do update set
     created_at_utc = excluded.created_at_utc,
     plan_json = excluded.plan_json;";
 
-        await using var cmd = _dataSource.CreateCommand(sql);
+        await using var conn = await _dataSource.OpenConnectionAsync(ct);
+        await using var cmd = new NpgsqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("plan_id", plan.PlanId);
         cmd.Parameters.AddWithValue("alert_id", alertId);
         cmd.Parameters.AddWithValue("created_at_utc", plan.CreatedAtUtc.UtcDateTime);

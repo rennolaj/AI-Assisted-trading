@@ -9,8 +9,8 @@ public sealed class InMemoryIdempotencyStore : IIdempotencyStore
 {
     private readonly ConcurrentDictionary<string, byte> _keys = new();
 
-    public bool TryAdd(string key)
+    public Task<bool> TryAddAsync(string key, CancellationToken ct)
     {
-        return _keys.TryAdd(key, 0);
+        return Task.FromResult(_keys.TryAdd(key, 0));
     }
 }
