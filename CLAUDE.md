@@ -1,6 +1,7 @@
-# Claude Multi-Agent Operating Contract
+# CLAUDE.md
 
-> **Auto-read by GitHub Copilot CLI (Claude) when working in this repository.**
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 > Defines the multi-agent workflow, C# 14 / .NET 10 standards, and all known
 > anti-patterns discovered during the M14 technical review.
 > Any agent working on this repo must read this file first.
@@ -13,12 +14,12 @@
 |----------|-------|
 | Name | AI-Assisted Trading Server |
 | Repo | `rennolaj/AI-Assisted-trading` |
-| Path | `/Users/jrennola/Hobby/AI-Assisted` |
 | SDK | `10.0.101` (pinned via `global.json`) |
 | Framework | `net10.0` — all 8 projects via `Directory.Build.props` |
 | Language | **C# 14** (default for net10.0; no `LangVersion` override) |
 | Nullable | `enable` (global) |
 | ImplicitUsings | `enable` (global) |
+| Status | Demo mode — Kraken Futures sandbox only, no live capital |
 
 ### Source Projects
 ```
@@ -32,6 +33,72 @@ src/Mvp.Trading.Risk            — Risk evaluation
 src/Mvp.Trading.Worker          — BackgroundService workers (AlertWorker, ReconciliationWorker)
 tests/                          — xUnit test projects
 ```
+
+---
+
+## Commands
+
+Bash scripts (`scripts/*.sh`) run on macOS/Linux/Git Bash; PowerShell equivalents (`scripts/*.ps1`) exist for `restore`, `build`, `test`, and `dotnet`. Agent scripts under `scripts/agents/` are bash-only.
+
+```bash
+./scripts/restore.sh                  # restore NuGet packages
+./scripts/build.sh                    # build solution (BUILD_GATE)
+./scripts/test.sh                     # run all 7 test projects (TEST_GATE)
+```
+
+- `build.sh` bootstraps local PostgreSQL + Redis by default — set `DEV_BOOTSTRAP=0` to skip if you manage those yourself (CI sets this automatically).
+- `test.sh` runs with `--no-build`, so always build first.
+
+```bash
+# Single test project
+dotnet test tests/Mvp.Trading.Elliott.Tests/Mvp.Trading.Elliott.Tests.csproj
+
+# Single test (filter by name)
+dotnet test --filter "FullyQualifiedName~ElliottEngineTests.GenerateCandidates"
+
+# Run API / Worker locally
+dotnet run --project src/Mvp.Trading.Api/Mvp.Trading.Api.csproj
+dotnet run --project src/Mvp.Trading.Worker/Mvp.Trading.Worker.csproj
+
+# Full stack (Postgres, Redis, API, Worker, Prometheus, Grafana)
+docker compose up --build -d
+
+# End-to-end smoke test (Docker + ngrok, needs .env.smoke)
+./scripts/smoke.sh
+```
+
+Health/observability: `http://localhost:8080/health`, `/health/dependencies`, `/metrics` (API), `:9464/metrics` (Worker), Prometheus `:9090`, Grafana `:3000`. Full command catalog: `docs/development/command-reference.md`.
+
+---
+
+## Architecture (Big Picture)
+
+Event-driven pipeline — every alert flows through these stages in order, and every stage persists an audit record to PostgreSQL:
+
+```
+TradingView webhook → POST /webhooks/tradingview/{secret}   (Api: secret check, idempotency, normalize → AlertEvent)
+  → PostgreSQL (raw alert) + Redis list (queue)
+  → AlertWorker (Worker project — orchestrates the whole pipeline; refactor tracked as M14.9.1)
+      → IndicatorEngine: RSI/MACD/StochRSI/Volume across M5/M15/M30/H1/H2 → SignalSnapshot
+      → Elliott engine: Kraken OHLC → ZigZag pivots → ElliottCandidate (rule violations, invalidation price)
+      → Adjudication gate: LLM adjudication via MCP gateway (OpenAI or local LLM, strict schema, fail-closed)
+        — ADR-001 (proposed) replaces this with a deterministic 4-rule engine in M16; LLM becomes advisory-only in M16/M17
+      → ALLOW: Risk engine builds TradePlan (sizing, stop, take-profits)
+      → KillSwitch checked immediately before execution (must fail CLOSED)
+      → ExecutionService places entry + stop + take-profit orders on Kraken Futures demo
+  REJECT → audit trail only
+ReconciliationWorker cross-checks internal vs. exchange state every 60s
+```
+
+Cross-cutting conventions that span projects:
+- **`Result<T>` envelope everywhere**: services return `Result<T>` at boundaries; exceptions never cross layers. Defined in `Mvp.Trading.Contracts` along with all shared DTOs (sealed records).
+- **Fail-closed is a financial invariant**: on any doubt (DB unreachable, config invalid), the safe state is "do not trade" — KillSwitch must default to `EMERGENCY_STOP`, never inactive (enforced by the KS-1 remediation, story M14.5.1).
+- **Fixture mode**: `FixtureMarketDataProvider` in the Kraken project substitutes recorded market data for deterministic testing (`docs/configuration/fixture-mode-switching.md`, `scripts/fixtures/`).
+- Persistence tables map 1:1 to pipeline stages (`alerts`, `indicator_snapshots`, `elliott_candidates`, `llm_adjudications`, `trade_plan`, `execution_intent`, `order_receipt`, `open_trades`, `system_state`, `kill_switch_audit`) — see `docs/architecture/architecture.md`.
+
+### Documentation for Agents
+
+Start with `docs/context-index.yaml` — it maps task types (builder, reviewer, tester, integrator, trading-pipeline, kraken, llm-ai, security, operations) to curated doc sets. Load the smallest matching context pack from `docs/context/` rather than reading `docs/` wholesale.
 
 ---
 
@@ -336,6 +403,7 @@ image: prom/prometheus:v2.53.0
 - **BUILD_GATE**: always verify `./scripts/build.sh` passes before marking done
 - **TEST_GATE**: always verify `./scripts/test.sh` passes before marking done
 - **SKILL_REF**: always read `docs/development/csharp-dotnet10-skill.md` before writing C# code
+- **COMMITS**: conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`); link story/milestone numbers; explain WHY, not just WHAT
 
 Every agent output must end with:
 ```
@@ -346,7 +414,7 @@ Blocked items: <none | list>
 ### Stage Order (Claude-Native)
 
 ```
-You (Copilot CLI / orchestrator)
+You (Claude Code / orchestrator)
   ├─ 1. task[planner]       background → read_agent(wait:true)
   ├─ 2. task[rubber-duck]   sync → validate planner output before builder starts
   ├─ 3. task[builder]       background → read_agent(wait:true)
@@ -544,7 +612,7 @@ Write: outbox/integrator.md, outbox/integrator.json
 Create: state/integrator.done
 ```
 
-#### orchestrator (you / Copilot CLI)
+#### orchestrator (you / Claude Code)
 ```
 Read: all outbox/*.md files
 Decide:
@@ -591,14 +659,18 @@ nano /tmp/multi-agent-sync/<scope-id>/context.md
 
 ## AO Integration (if using Agent Orchestrator with Claude support)
 
+AO is a separate legacy flow driven through the Copilot CLI runtime — it is distinct
+from the Claude-native task-tool flow described above. Its config lives in
+`claude-orchestrator.yaml` at the repo root; set `path` to your local clone.
+
 ```yaml
 # claude-orchestrator.yaml
 defaults:
   agent: claude
-  runtime: copilot-cli
+  runtime: copilot-cli   # AO runtime plugin name — not the Claude-native flow
 projects:
   AI-Assisted:
-    path: /Users/jrennola/Hobby/AI-Assisted
+    path: <absolute path to your local clone>
     defaultBranch: main
 ```
 

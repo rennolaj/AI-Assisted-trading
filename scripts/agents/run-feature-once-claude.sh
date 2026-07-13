@@ -84,7 +84,7 @@ You are the ORCHESTRATOR for scope '${SCOPE}' in the AI-Assisted .NET 10 trading
 
 Read the contract and anti-pattern rules first:
   ${ROOT}/CLAUDE.md
-  ${ROOT}/docs/csharp-dotnet10-skill.md
+  ${ROOT}/docs/development/csharp-dotnet10-skill.md
 
 Feature context:
   ${SYNC_DIR}/context.md
@@ -105,7 +105,7 @@ Launch: task agent_type=general-purpose, mode=background, name="planner-${SCOPE}
 Prompt for planner:
   You are the PLANNER for scope '${SCOPE}'.
   Read: ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/planner.md
-  Read: ${ROOT}/CLAUDE.md (roles + anti-patterns), ${ROOT}/docs/csharp-dotnet10-skill.md
+  Read: ${ROOT}/CLAUDE.md (roles + anti-patterns), ${ROOT}/docs/development/csharp-dotnet10-skill.md
   Produce a deterministic implementation plan:
     1. Exact files to create or modify with reason
     2. Implementation steps in dependency order
@@ -140,7 +140,7 @@ Launch: task agent_type=general-purpose, mode=background, name="builder-${SCOPE}
 Prompt for builder:
   You are the BUILDER for scope '${SCOPE}'.
   Read: ${SYNC_DIR}/context.md, ${SYNC_DIR}/inbox/builder.md
-  Read: ${ROOT}/CLAUDE.md (M14 anti-patterns), ${ROOT}/docs/csharp-dotnet10-skill.md
+  Read: ${ROOT}/CLAUDE.md (M14 anti-patterns), ${ROOT}/docs/development/csharp-dotnet10-skill.md
   Read: ${SYNC_DIR}/outbox/planner.md
   Steps:
     1. Run: cd ${ROOT} && ./scripts/restore.sh
@@ -164,7 +164,7 @@ Launch BOTH in the same response (parallel):
 
 4a. task agent_type=code-review, mode=background, name="reviewer-${SCOPE}"
   Prompt: Review all changes for scope '${SCOPE}'.
-  Read: ${ROOT}/CLAUDE.md, ${ROOT}/docs/csharp-dotnet10-skill.md
+  Read: ${ROOT}/CLAUDE.md, ${ROOT}/docs/development/csharp-dotnet10-skill.md
   Read: ${SYNC_DIR}/outbox/builder.diff  ← primary review source (full unified diff)
   Read: ${SYNC_DIR}/outbox/builder.md for context on what was changed and why
   Do NOT checkout any branch. The diff file contains everything needed.

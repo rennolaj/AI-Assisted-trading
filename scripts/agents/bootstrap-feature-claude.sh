@@ -108,7 +108,7 @@ if [[ ! -f "${SYNC_DIR}/context.md" ]]; then
 
 ## References
 - Backlog stories: <!-- e.g., M14.5.1, M14.5.2 -->
-- Skill file: ${ROOT}/docs/csharp-dotnet10-skill.md
+- Skill file: ${ROOT}/docs/development/csharp-dotnet10-skill.md
 - Contract: ${ROOT}/CLAUDE.md
 CONTEXT
   echo "Created context placeholder: ${SYNC_DIR}/context.md"
@@ -125,7 +125,7 @@ for role in planner builder reviewer quality tester integrator orchestrator; do
 
 Read \`${SYNC_DIR}/context.md\` for feature brief.
 Read \`${ROOT}/CLAUDE.md\` for role instructions, policies, and M14 anti-patterns.
-Read \`${ROOT}/docs/csharp-dotnet10-skill.md\` for C# 14 / .NET 10 standards.
+Read \`${ROOT}/docs/development/csharp-dotnet10-skill.md\` for C# 14 / .NET 10 standards.
 
 Write your report to:
   ${SYNC_DIR}/outbox/${role}.md  (human-readable)

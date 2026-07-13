@@ -47,6 +47,17 @@ docker exec ai-assisted-worker-1 ls /app/tests/fixtures/kraken-futures/
 # Should list: btcusd_p_m1_varied.json, etc.
 ```
 
+> **Path resolution caveat**: a relative `MARKETDATA_FIXTURE_PATH` is resolved
+> against the application's build output directory (`AppContext.BaseDirectory`),
+> NOT the repo root. It works in Docker because compose mounts the fixtures under
+> the container workdir — when running the Worker as a host process
+> (`dotnet run`), use an **absolute path** or the catalog silently loads nothing
+> ("No fixtures loaded" warning, then `FIXTURE_NOT_FOUND` on every alert).
+>
+> Fixture symbols must match the alert ticker: bundled series cover `BTCUSD.P`
+> and `PF_ETHUSD`. M1 series are automatically aggregated up to any higher
+> timeframe (M5/M15/M30/H1/H2), so an M1 fixture is sufficient per symbol.
+
 ### Switch to Production Mode (for real trading)
 
 ```bash

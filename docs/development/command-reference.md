@@ -337,6 +337,49 @@ docker compose logs -f api worker
 docker compose down
 ```
 
+### Host-Process Smoke Test (no Docker, no ngrok)
+
+When Docker is unavailable (e.g. WSL without Docker Desktop integration), the same
+smoke test runs against host processes. ngrok is only needed for real TradingView
+delivery — `smoke.sh` POSTs directly to `BASE_URL`.
+
+```bash
+# 1. Local Postgres + Redis must be running with the schema applied
+#    (./scripts/dev/bootstrap.sh, or manually: createdb + scripts/db/init.sql)
+
+# 2. Start API and Worker as host processes.
+#    .env.smoke KEY=VALUE names do NOT map automatically outside docker compose —
+#    pass the Section__Key equivalents explicitly:
+ASPNETCORE_URLS=http://localhost:8080 \
+TradingView__WebhookSecret=<secret from .env.smoke> \
+Postgres__ConnectionString="Host=localhost;Port=5432;Database=ai-trading-db;Username=postgres;Password=postgres" \
+Redis__ConnectionString=localhost:6379 \
+dotnet run --project src/Mvp.Trading.Api/Mvp.Trading.Api.csproj &
+
+Postgres__ConnectionString="Host=localhost;Port=5432;Database=ai-trading-db;Username=postgres;Password=postgres" \
+Redis__ConnectionString=localhost:6379 \
+OpenAI__ApiKey=<key> \
+MarketData__Mode=fixtures \
+MarketData__FixturesPath=/absolute/path/to/repo/tests/fixtures/kraken-futures \
+dotnet run --project src/Mvp.Trading.Worker/Mvp.Trading.Worker.csproj &
+
+# 3. Run the smoke test locally (overrides win over .env.smoke values)
+BASE_URL=http://localhost:8080 NGROK_AUTOSTART=0 ./scripts/smoke.sh
+```
+
+Extra manual assertions worth running after a green smoke test:
+
+```bash
+# Duplicate idempotency key must be ignored (expects 200 duplicate_ignored)
+curl -sS -w "\n%{http_code}\n" -H "Content-Type: application/json" \
+  -d '{"idempotencyKey":"dup-1","ticker":"BTCUSD.P","exchange":"krakenfutures","interval":"1","close":65000,"volume":1200,"directionHint":"long","symbolHint":"BTCUSD.P","reason":"dup"}' \
+  "http://localhost:8080/webhooks/tradingview/$SECRET"   # run twice
+
+# Wrong secret must return 401
+curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Content-Type: application/json" \
+  -d '{}' "http://localhost:8080/webhooks/tradingview/wrong-secret"
+```
+
 ### Manual Webhook Testing
 
 ```bash
@@ -570,6 +613,56 @@ curl http://localhost:8080/health/dependencies
 # Restart worker
 docker compose restart worker
 ```
+
+#### Alert Fails: `'<' is an invalid start of a value`
+The Kraken market-data fetch received HTML instead of JSON — typically
+`demo-futures.kraken.com` responding with a marketing-page redirect (network/geo
+dependent). Diagnose and work around with fixture mode:
+```bash
+# Reproduce: a redirect (301) to www.kraken.com means the REST base is unusable
+curl -sL -o /dev/null -w "%{http_code} %{url_effective}\n" \
+  https://demo-futures.kraken.com/derivatives/api/v3/instruments
+
+# Workaround: switch the worker to fixture-backed market data
+MARKETDATA_MODE=fixtures
+MARKETDATA_FIXTURE_PATH=tests/fixtures/kraken-futures   # see path note below
+```
+NOTE: `MARKETDATA_FIXTURE_PATH` resolves relative paths against the app's build
+output directory (`AppContext.BaseDirectory`), not the repo root. Inside Docker the
+compose file mounts fixtures under `/app`, so the relative path works; for host
+processes use an ABSOLUTE path. Fixture symbols must match the alert ticker
+(fixtures ship for `BTCUSD.P` and `PF_ETHUSD`; M1 series are auto-aggregated to
+higher timeframes).
+
+#### Worker Crashes at Startup: `PrometheusExporter HttpListener could not be started`
+`Address already in use` on port 9464 — another Worker instance is still running
+(host process or container) and holds the metrics port.
+```bash
+ss -tlnp | grep 9464                       # find the holder
+pkill -f "net10.0/Mvp.Trading.Worker"      # stop stale host-process workers
+```
+
+#### LLM Adjudication Always REJECTs — OpenAI Error Matrix
+Every alert being rejected with `LLM_DECISION:REJECT` is fail-closed behavior; check
+the worker log for the underlying OpenAI error and decode it:
+
+| HTTP | code | Meaning | Fix |
+|------|------|---------|-----|
+| 401 | `invalid_api_key` | Key wrong/revoked | Regenerate at platform.openai.com; update `.env.smoke` |
+| 403 | `model_not_found` | Project's "allowed models" list blocks the model in `config/mcp.json` | Project settings → Limits → Model usage: allow the model (alias AND dated snapshot are separate entries) |
+| 429 | `insufficient_quota` | No org credits or project budget exhausted | Billing → Add to credit balance (org level — verify the org matches the key); check project monthly budget |
+
+```bash
+# Verify the key + model directly (reads key from .env.smoke, never echo it)
+set -a; source .env.smoke; set +a
+curl -sS -i https://api.openai.com/v1/responses \
+  -H "Authorization: Bearer $OPENAI_API_KEY" -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5.4-mini","input":"ping","max_output_tokens":16}'
+# Keep the x-request-id header if you need to contact OpenAI support
+```
+If the OpenAI→local-LLM fallback is enabled (`MCP_FALLBACK_ON_OPENAI_429=true`),
+also confirm the local endpoint (`LOCAL_LLM_BASE_URL`) is actually reachable —
+an unreachable fallback silently degrades to fail-closed REJECT.
 
 ### Debug Mode
 

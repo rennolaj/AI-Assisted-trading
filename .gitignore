@@ -19,6 +19,9 @@ infra/azure/parameters.local.json
 # Git worktrees
 .worktrees/
 
+# Claude Code local settings (personal overrides, not shared config)
+.claude/settings.local.json
+
 # Logs
 error.log
 

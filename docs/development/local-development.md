@@ -63,6 +63,12 @@ docker compose --env-file .env.smoke up -d --build api worker
 ./scripts/smoke.sh
 ```
 
+No Docker available? The smoke test also runs against host processes (ngrok is
+only needed for real TradingView delivery). See "Host-Process Smoke Test" and the
+smoke troubleshooting entries (Kraken HTML redirects, fixture path resolution,
+OpenAI 401/403/429 matrix) in
+[command-reference.md](command-reference.md#smoke-testing).
+
 ## Fixture Capture (Kraken history)
 
 ```bash
