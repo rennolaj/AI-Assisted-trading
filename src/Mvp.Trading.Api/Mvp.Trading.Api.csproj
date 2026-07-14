@@ -26,6 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Mvp.Trading.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Include="..\..\config\mcp.json" Link="config\mcp.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\config\risk-policy.json" Link="config\risk-policy.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\config\account.json" Link="config\account.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
